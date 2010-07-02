@@ -4,16 +4,13 @@
 	MonthGame.draw)
   (:gen-class))
 
-(import '(javax.swing JFrame JPanel)
-	'(java.awt Color Graphics Dimension)
+(import '(javax.swing JFrame JPanel JButton)
+	'(java.awt Color Graphics Dimension BorderLayout)
 	'(java.awt.image BufferedImage)
 	'(javax.imageio ImageIO)
-	'(java.awt.event MouseAdapter MouseEvent))
+	'(java.awt.event MouseAdapter MouseEvent ActionListener))
 
 (def running true)
-
-(defn incr-cyclic [n max]
-  (mod (+ n 1) max))
 
 ;; agent to handle issuing the repaints
 (def animator (agent nil))
@@ -23,7 +20,8 @@
 (defstruct tank-struct
   :angle :pos :oto :sprites
   :rotate-rate :move-rate
-  :move-energy :fire-energy :state)
+  :move-energy :fire-energy
+  :max-move-energy :max-fire-energy :state)
 
 (defstruct world-struct
   :tanks :current-tank)
@@ -31,6 +29,18 @@
 (defn get-current-tank [world]
   (nth (:tanks world) (:current-tank world)))
 
+(defn incr-cyclic [n max]
+  (mod (+ n 1) max))
+
+(defn make-next-tank-current [world]
+  (assoc world :current-tank
+	 (incr-cyclic (:current-tank world) (count (:tanks world)))))
+
+(defn reset-tank-energy [tank]
+  (assoc tank
+    :move-energy (:max-move-energy tank)
+    :fire-energy (:max-fire-energy tank)))
+  
 (defmacro with-each-tank [world var & forms]
   `(dorun (for [~var (:tanks ~world)]
 	   ~@forms)))
@@ -54,22 +64,25 @@
     (struct tank-struct 
 	    angle pos oto frames
 	    rotate-rate move-rate
+	    move-energy fire-energy
 	    move-energy fire-energy :idle)))
 
+(defn draw-tank-meta [g tank]
+  (doto g
+    (.setColor (. Color white))
+    (draw-leader (:pos tank) 50 0)
+    (.setColor (. Color black))
+    (draw-leader (:pos tank) 50 (:angle tank))
+    (draw-circle (:pos tank) 50 30)
+    (.setColor (. Color red))
+    (draw-circle (:pos tank) (:fire-energy tank) 30)
+    (.setColor (. Color blue))
+    (draw-circle (:pos tank) (:move-energy tank) 30)))
+    
 (defn draw-tank [g tank]
   (let [frame (angle-to-frame (:angle tank) (num-frames tank))
 	tgt (vint (vsub (:pos tank) (:oto tank)))]
-    (doto g
-      (.setColor (. Color white))
-      (draw-leader (:pos tank) 50 0)
-      (.setColor (. Color black))
-      (draw-leader (:pos tank) 50 (:angle tank))
-      (draw-circle (:pos tank) 50 30)
-      (.setColor (. Color red))
-      (draw-circle (:pos tank) (:fire-energy tank) 30)
-      (.setColor (. Color blue))
-      (draw-circle (:pos tank) (:move-energy tank) 30)
-      (draw-img (nth (:sprites tank) frame) tgt))))
+    (draw-img g (nth (:sprites tank) frame) tgt)))
 
 (defstruct mouse-struct :pos :button1down :button2down :lastevent)
 
@@ -99,6 +112,10 @@
      ;; draw pointer
      (if (:pos @mouse)
        (draw-circle bg (:pos @mouse) 30 30))
+
+     ;; draw tank power info
+     (with-each-tank @world tank
+       (draw-tank-meta bg @tank))
 
      ;; draw tanks
      (with-each-tank @world tank
@@ -149,7 +166,8 @@
      true 0)))
 
 (defn subtract-energy [tank energy-type factor]
-  (assoc tank energy-type (- (energy-type tank) (* factor (:move-rate tank)))))
+  (assoc tank energy-type 
+	 (max 0 (- (energy-type tank) (* factor (:move-rate tank))))))
 
 (defn subtract-move-energy [tank factor]
   (subtract-energy tank :move-energy factor))
@@ -157,17 +175,30 @@
 (defn subtract-fire-energy [tank factor]
   (subtract-energy tank :fire-energy factor))
 
+(defn can-move? [tank]
+  (> (:move-energy tank) 0))
+
+(defn can-fire? [tank]
+  (> (:fire-energy tank) 0))
+
+(defn tank-depleted? [tank]
+  (and (not (can-move? tank))
+       (not (can-fire? tank))))
+
 (defn move-towards-cursor [tank mouse]
   (let [to-mouse (vsub (:pos mouse) (:pos tank))
 	tank-dir (unitdir (discretize-angle (:angle tank) (num-frames tank)))
 	dtheta (vang to-mouse tank-dir)
 	rotate-dir (dir-to-rotate tank-dir to-mouse)]
+    ;; only move if we're not where the mouse is
     (if (> (vmag to-mouse) 50)
       (if (within dtheta (frame-angle-tolerance tank))
+	;; drive forward, we're as accurate in angle as we can be
 	(-> tank
 	    (assoc :pos (vadd (:pos tank) (vmul tank-dir (:move-rate tank))))
 	    (subtract-move-energy 1)
 	    (subtract-fire-energy 2))
+	;; turn
 	(-> tank
 	    (assoc :angle
 	      (add-on-circle (:angle tank)
@@ -176,13 +207,26 @@
       tank)))
 	
 (defn animate-tank [tank mouse]
-  (if (:button1down mouse)
+  (if (and (:button1down mouse) (can-move? tank))
     (move-towards-cursor tank mouse)
     tank))
+
+(defn change-player [world]
+  (println "changing players")
+  (alter (get-current-tank @world) reset-tank-energy)
+  (println "make next current")
+  (alter world make-next-tank-current))
   
 (defn animation [x panel world]
   (dosync
-   (alter (get-current-tank @world) animate-tank @mouse))
+   (let [tank (get-current-tank @world)]
+     ;; switch players if current is out of energy
+     (if (tank-depleted? @tank)
+       (change-player world))
+
+     ;; animate the current player
+     (alter tank animate-tank @mouse)))
+
   (.repaint panel)
   (Thread/sleep animation-sleep-ms)
   (send-off *agent* #'animation panel world))
@@ -200,10 +244,16 @@
 	tank2 (ref (make-tank frames '(0 15) (/ (* 2 Math/PI) 3) '(300 300)))
 	panel (proxy [JPanel] []
 		(paint [g] (my-draw g this my-world)))
+	end-turn-button (new JButton "End Turn")
+	change-player-listener (proxy [ActionListener] []
+				 (actionPerformed [ev] 
+						  (dosync (change-player my-world))))
 	main-window (JFrame. "Month Game")]
 
     (dosync
      (alter my-world assoc :tanks (list tank1 tank2) :current-tank 0))
+
+    (.addActionListener end-turn-button change-player-listener)
 
     (doto panel
       (.addMouseListener mouse-adapter)
@@ -212,7 +262,8 @@
 
     (doto main-window
       (.setSize 400 400)
-      (.add panel)
+      (.add panel (. BorderLayout CENTER))
+      (.add end-turn-button (. BorderLayout SOUTH))
       ;(.setDefaultCloseOperation (. JFrame EXIT_ON_CLOSE))
       (.setVisible true))
 
