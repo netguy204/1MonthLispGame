@@ -20,10 +20,13 @@
 (def animation-sleep-ms 50)
 
 ; oto = offset to origin center of mass - top left corner of sprite
-(defstruct tank :angle :pos :oto :sprites :state)
+(defstruct tank-struct :angle :pos :oto :sprites :state)
 
 (defn num-frames [tank]
   (count (:sprites tank)))
+
+(defn frame-angle-tolerance [tank]
+  (rad-per-frame (num-frames tank)))
 
 (defn make-tank [fname tgt-sz doto]
   (let [frames (load-sprites fname tgt-sz)
@@ -32,17 +35,18 @@
 	midsprite (list (/ width 2) (/ height 2))
 	oto (vadd midsprite doto)]
 
-    (struct tank 0 midsprite oto frames :idle)))
+    (struct tank-struct 0 midsprite oto frames :idle)))
 
 (defn draw-tank [g tank]
-  (let [frame (angle-to-frame (:angle tank) (num-frames tank))]
-    (draw-img g (nth (:sprites tank) frame) (vsub (:pos tank) (:oto tank)))))
+  (let [frame (angle-to-frame (:angle tank) (num-frames tank))
+	tgt (vint (vsub (:pos tank) (:oto tank)))]
+    (draw-img g (nth (:sprites tank) frame) tgt)))
 
 (def my-tank (ref (make-tank "tanksprite.png" 128 '(0 15))))
 
-(defstruct mouse-state :pos :button1down :button2down :lastevent)
+(defstruct mouse-struct :pos :button1down :button2down :lastevent)
 
-(def mouse (ref (struct mouse-state nil false false)))
+(def mouse (ref (struct mouse-struct nil false false)))
 
 (defn add-on-circle [angle incr]
      (let [new-angle (+ angle incr)
@@ -63,8 +67,8 @@
        (.setColor (. Color green))
        (.fillRect 0 0 width height)
        (.setColor (. Color black))
-       (draw-leader o 50 (:angle @my-tank))
-       (draw-circle o 50 30)
+       (draw-leader (:pos @my-tank) 50 (:angle @my-tank))
+       (draw-circle (:pos @my-tank) 50 30)
        (draw-tank @my-tank))
      (if (:pos @mouse)
        (draw-circle bg (:pos @mouse) 30 30)))
@@ -111,15 +115,29 @@
 		   (.add panel)
 		   (.setVisible true)))
 
-(defn animate-tank [tank mouse] nil)
+(defn within [v range]
+  (< (Math/abs v) range))
+
+(defn move-towards-cursor [tank mouse]
+  (let [to-mouse (vsub (:pos mouse) (:pos tank))
+	tank-dir (unitdir (discretize-angle (:angle tank) (num-frames tank)))
+	dtheta (vang to-mouse tank-dir)]
+    (if (> (vmag to-mouse) 50)
+      (if (within dtheta (frame-angle-tolerance tank))
+	(assoc tank :pos (vadd (:pos tank) (vmul tank-dir 0.7)))
+	(assoc tank :angle (add-on-circle (:angle tank) 0.01)))
+      tank)))
+	
+(defn animate-tank [tank mouse]
+  (if (:button1down mouse)
+    (move-towards-cursor tank mouse)
+    tank))
   
 (defn animation [x]
-     (when running
-       (send-off *agent* #'animation))
+     (dosync
+      (alter my-tank animate-tank @mouse))
      (.repaint panel)
      (Thread/sleep animation-sleep-ms)
-     (dosync 
-      (alter my-tank assoc :angle (add-on-circle (:angle @my-tank) 0.01))))
-
+     (send-off *agent* #'animation))
 
 (send-off animator animation)

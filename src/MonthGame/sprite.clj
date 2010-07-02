@@ -21,7 +21,6 @@
 		0 0 new-width new-height
 		sx1 0 sx2 height nil)
     (.dispose bg)
-    (println simg)
     simg))
 
 (defn frame-width [src count]
