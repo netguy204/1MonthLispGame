@@ -18,9 +18,12 @@
 	[x2 y2] v2]
     (list (+ x1 x2) (+ y1 y2))))
 
+(defn neg [n]
+  (- 0 n))
+
 (defn vneg [v]
   (let [[x y] v]
-    (list (- 0 x) (- 0 y))))
+    (list (neg x) (neg y))))
 
 (defn vsub [v1 v2]
   (vadd v1 (vneg v2)))

@@ -41,14 +41,12 @@
   (let [frame (angle-to-frame (:angle tank) (num-frames tank))
 	tgt (vint (vsub (:pos tank) (:oto tank)))]
     (doto g
+      (.setColor (. Color white))
+      (draw-leader (:pos tank) 50 0)
+      (.setColor (. Color black))
       (draw-leader (:pos tank) 50 (:angle tank))
       (draw-circle (:pos tank) 50 30)
       (draw-img (nth (:sprites tank) frame) tgt))))
-
-(def my-tank 
-     (let [img (.getResourceAsStream (clojure.lang.RT/baseLoader) 
-				     "MonthGame/tanksprite.png")]
-       (ref (make-tank img 128 '(0 15)))))
 
 (defstruct mouse-struct :pos :button1down :button2down :lastevent)
 
@@ -68,12 +66,10 @@
 		 (. BufferedImage TYPE_INT_ARGB))
 	bg (.getGraphics img)
 	o (list 64 64)]
-    (println tank)
     (dosync
      (doto bg
        (.setColor (. Color green))
        (.fillRect 0 0 width height)
-       (.setColor (. Color black))
        (draw-tank @tank))
      (if (:pos @mouse)
        (draw-circle bg (:pos @mouse) 30 30)))
@@ -111,6 +107,16 @@
 (defn within [v range]
   (< (Math/abs v) range))
 
+(defn dir-to-rotate [vfrom vto]
+  (let [afrom (vang vfrom)
+	ato (vang vto)
+	delta (- ato afrom)
+	pi (Math/PI)]
+    (cond
+     (> delta 0) (if (< delta pi) 1 -1)
+     (< delta 0) (if (< delta (neg pi)) 1 -1)
+     true 0)))
+     
 (defn move-towards-cursor [tank mouse]
   (let [to-mouse (vsub (:pos mouse) (:pos tank))
 	tank-dir (unitdir (discretize-angle (:angle tank) (num-frames tank)))
@@ -118,7 +124,8 @@
     (if (> (vmag to-mouse) 50)
       (if (within dtheta (frame-angle-tolerance tank))
 	(assoc tank :pos (vadd (:pos tank) (vmul tank-dir 0.7)))
-	(assoc tank :angle (add-on-circle (:angle tank) 0.01)))
+	(assoc tank :angle (add-on-circle (:angle tank)
+					  (* 0.01 (dir-to-rotate tank-dir to-mouse)))))
       tank)))
 	
 (defn animate-tank [tank mouse]
@@ -135,7 +142,11 @@
 
 (defn -main [& args]
 
-  (let [panel (proxy [JPanel] []
+  (let [loader (clojure.lang.RT/baseLoader)
+	tank-img (.getResourceAsStream loader "MonthGame/tanksprite.png")
+	my-tank (ref (make-tank tank-img 128 '(0 15)))
+	
+	panel (proxy [JPanel] []
 		(paint [g] (my-draw g this my-tank)))
 	main-window (JFrame. "Month Game")]
     (doto panel
@@ -146,6 +157,7 @@
     (doto main-window
       (.setSize 400 400)
       (.add panel)
+      (.setDefaultCloseOperation (. JFrame EXIT_ON_CLOSE))
       (.setVisible true))
 
     (send-off animator animation panel my-tank)))
