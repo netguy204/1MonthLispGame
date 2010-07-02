@@ -6,8 +6,8 @@
 	'(java.io File)
 	'(javax.imageio ImageIO))
 
-(defn load-img [fname]
-  (ImageIO/read (new File fname)))
+(defn load-img [stream]
+  (ImageIO/read stream))
 
 (defn extract-sprite [img width new-width n]
   (let [height (.getHeight img)
@@ -27,8 +27,8 @@
   (let [width (.getWidth src)]
     (/ width count)))
 
-(defn load-sprites [fname tgtsz]
-     (let [img (load-img fname)
+(defn load-sprites [stream tgtsz]
+     (let [img (load-img stream)
 	   height (.getHeight img)
 	   width (.getWidth img)
 	   frames (/ width height)

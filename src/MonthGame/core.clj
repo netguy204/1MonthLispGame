@@ -28,8 +28,8 @@
 (defn frame-angle-tolerance [tank]
   (rad-per-frame (num-frames tank)))
 
-(defn make-tank [fname tgt-sz doto]
-  (let [frames (load-sprites fname tgt-sz)
+(defn make-tank [stream tgt-sz doto]
+  (let [frames (load-sprites stream tgt-sz)
 	width (.getWidth (first frames))
 	height (.getHeight (first frames))
 	midsprite (list (/ width 2) (/ height 2))
@@ -40,9 +40,15 @@
 (defn draw-tank [g tank]
   (let [frame (angle-to-frame (:angle tank) (num-frames tank))
 	tgt (vint (vsub (:pos tank) (:oto tank)))]
-    (draw-img g (nth (:sprites tank) frame) tgt)))
+    (doto g
+      (draw-leader (:pos tank) 50 (:angle tank))
+      (draw-circle (:pos tank) 50 30)
+      (draw-img (nth (:sprites tank) frame) tgt))))
 
-(def my-tank (ref (make-tank "tanksprite.png" 128 '(0 15))))
+(def my-tank 
+     (let [img (.getResourceAsStream (clojure.lang.RT/baseLoader) 
+				     "MonthGame/tanksprite.png")]
+       (ref (make-tank img 128 '(0 15)))))
 
 (defstruct mouse-struct :pos :button1down :button2down :lastevent)
 
@@ -55,21 +61,20 @@
 	     (< new-angle 0) (+ new-angle twopi)
 	     true new-angle)))
 	   
-(defn my-draw [g this]
+(defn my-draw [g this tank]
   (let [width (.getWidth this)
 	height (.getHeight this)
 	img (new BufferedImage width height
 		 (. BufferedImage TYPE_INT_ARGB))
 	bg (.getGraphics img)
 	o (list 64 64)]
+    (println tank)
     (dosync
      (doto bg
        (.setColor (. Color green))
        (.fillRect 0 0 width height)
        (.setColor (. Color black))
-       (draw-leader (:pos @my-tank) 50 (:angle @my-tank))
-       (draw-circle (:pos @my-tank) 50 30)
-       (draw-tank @my-tank))
+       (draw-tank @tank))
      (if (:pos @mouse)
        (draw-circle bg (:pos @mouse) 30 30)))
 
@@ -103,18 +108,6 @@
        (mouseReleased [e] (update-mouse e :released))
        (mouseWheelMoved [mwe] (println "wheeled"))))
 
-(def panel (proxy [JPanel] []
-	     (paint [g] (my-draw g this))))
-(doto panel
-  (.addMouseListener mouse-adapter)
-  (.addMouseMotionListener mouse-adapter)
-  (.addMouseWheelListener mouse-adapter))
-
-(def main-window (doto (JFrame. "Month Game")
-		   (.setSize 400 400)
-		   (.add panel)
-		   (.setVisible true)))
-
 (defn within [v range]
   (< (Math/abs v) range))
 
@@ -133,11 +126,26 @@
     (move-towards-cursor tank mouse)
     tank))
   
-(defn animation [x]
-     (dosync
-      (alter my-tank animate-tank @mouse))
-     (.repaint panel)
-     (Thread/sleep animation-sleep-ms)
-     (send-off *agent* #'animation))
+(defn animation [x panel tank]
+  (dosync
+   (alter tank animate-tank @mouse))
+  (.repaint panel)
+  (Thread/sleep animation-sleep-ms)
+  (send-off *agent* #'animation panel tank))
 
-(send-off animator animation)
+(defn -main [& args]
+
+  (let [panel (proxy [JPanel] []
+		(paint [g] (my-draw g this my-tank)))
+	main-window (JFrame. "Month Game")]
+    (doto panel
+      (.addMouseListener mouse-adapter)
+      (.addMouseMotionListener mouse-adapter)
+      (.addMouseWheelListener mouse-adapter))
+
+    (doto main-window
+      (.setSize 400 400)
+      (.add panel)
+      (.setVisible true))
+
+    (send-off animator animation panel my-tank)))

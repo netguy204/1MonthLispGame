@@ -6,7 +6,8 @@
 
 (defn vint [v]
   (let [[x y] v]
-    (list (int (Math/round x)) (int (Math/round y)))))
+    (list (int (Math/round (double x)))
+	  (int (Math/round (double y))))))
 
 (defn vmul [v s]
   (let [[x y] v]
