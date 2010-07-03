@@ -18,3 +18,6 @@
       (for [npe (:npes world)]
 	(draw npe g))))
 
+(defn add-npe-to-world [npe world]
+  (alter world assoc :npes (cons npe (:npes @world))))
+

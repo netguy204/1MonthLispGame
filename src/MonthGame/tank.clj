@@ -2,7 +2,8 @@
   (:use MonthGame.vector
 	MonthGame.scalar-math
 	MonthGame.sprite
-	MonthGame.draw))
+	MonthGame.draw
+	MonthGame.weapons))
 
 (import '(java.awt Color))
 
@@ -13,7 +14,7 @@
   :rotate-rate :move-rate
   :move-energy :fire-energy
   :max-move-energy :max-fire-energy
-  :charge :charge-rate :state)
+  :charge :charge-rate :weapon :state)
 
 (defn reset-tank-energy [tank]
   (assoc tank
@@ -47,7 +48,7 @@
 	    rotate-rate move-rate
 	    move-energy fire-energy
 	    move-energy fire-energy
-	    fire-charge charge-rate :idle)))
+	    fire-charge charge-rate nil :idle)))
 
 (defn tank-target-pos [tank]
   (let [angle (discretize-angle (:angle tank)
@@ -57,16 +58,18 @@
   target))
 
 (defn draw-tank-meta [g tank]
-  (doto g
-    ;(.setColor (. Color black))
-    ;(draw-leader (:pos tank) 50 (:angle tank))
-    ;(draw-circle (:pos tank) 50 30)
-    (.setColor (. Color red))
-    (draw-circle (:pos tank) (:fire-energy tank) 30)
-    (.setColor (. Color blue))
-    (draw-circle (:pos tank) (:move-energy tank) 30))
-  (if (= (:state tank) :charging)
-    (let [target (tank-target-pos tank)]
+  (let [target (tank-target-pos tank)
+	max-fire-range (range-for-energy (:weapon tank) (:fire-energy tank))]
+    (doto g
+      ;(.setColor (. Color black))
+      ;(draw-leader (:pos tank) 50 (:angle tank))
+      ;(draw-circle (:pos tank) 50 30)
+      (.setColor (. Color red))
+      (draw-circle (:pos tank) max-fire-range 30)
+      (.setColor (. Color blue))
+      (draw-circle (:pos tank) (:move-energy tank) 30))
+
+    (if (= (:state tank) :charging)
       (doto g
 	(.setColor (. Color red))
 	(draw-circle target (max 30 (* 0.25 (:charge tank))) 30)))))

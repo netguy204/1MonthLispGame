@@ -7,7 +7,8 @@
 	MonthGame.mouse
 	MonthGame.missiles
 	MonthGame.explosions
-	MonthGame.npe)
+	MonthGame.npe
+	MonthGame.weapons)
   (:gen-class))
 
 (import '(javax.swing JFrame JPanel JButton)
@@ -87,20 +88,49 @@
     (.dispose bg)
     (.drawImage g img 0 0 nil)))
 
+(def *missile-launcher*
+     (reify Weapon
+	    (fire [wpn pos target]
+		  (make-rocket pos target))
+
+	    (icon [wpn]
+		  (let [img (new BufferedImage 32 32
+				 (. BufferedImage TYPE_INT_ARGB))
+			bg (.getGraphics img)
+			rocket (first *rocket-frames*)
+			rw (.getWidth rocket)
+			rh (.getHeight rocket)]
+		    (doto bg
+		      (.drawImage rocket 0 0 32 32 0 0 rw rh)
+		      (.dispose))
+		    img))
+
+	    (range-for-energy [wpn energy] 
+			      (* 10 energy))
+
+	    (energy-used [wpn pos target]
+			 (/ (vdist pos target) 10))))
+
 (defn charge-for-fire [tank dt-secs]
    (let [was-charging (= (:state tank) :charging)
-	 tank (assoc tank :state :charging)]
+	 tank (assoc tank :state :charging)
+	 max-range (range-for-energy (:weapon tank) (:fire-energy tank))]
      (if was-charging
-       (assoc tank :charge (+ (:charge tank) (* dt-secs (:charge-rate tank))))
+       (assoc tank :charge 
+	      (min max-range (+ (:charge tank) (* dt-secs (:charge-rate tank)))))
        (assoc tank :charge 0))))
 
-(defn build-default-weapon-npe [tank target]
-  (make-rocket (:pos tank) target))
+(defn get-default-weapon [tank]
+  (:weapon tank))
 
 (defn fire-from-tank [tank world]
-  (let [target (tank-target-pos tank)
-	npe (build-default-weapon-npe tank target)]
-    (alter world assoc :npes (cons npe (:npes @world)))))
+  (let [target (tank-target-pos @tank)
+	pos (:pos @tank)
+	weapon (get-default-weapon @tank)
+	npe (fire weapon pos target)]
+    (add-npe-to-world npe world)
+    (alter tank subtract-fire-energy (energy-used weapon pos target))
+    (alter tank assoc :state :idle)))
     
 (defn animate-tank [tank mouse world dt-secs]
   (cond
@@ -113,8 +143,7 @@
    (and (= (:state @tank) :charging) (not (:button2down mouse)))
    (do
      (println "firing!")
-     (fire-from-tank @tank world)
-     (alter tank assoc :state :idle))
+     (fire-from-tank tank world))
 
    ;; move when left mouse depressed
    (and (:button1down mouse) (can-move? @tank))
@@ -165,6 +194,8 @@
 
     ; add the players to the world
     (dosync
+     (alter tank1 assoc :weapon *missile-launcher*)
+     (alter tank2 assoc :weapon *missile-launcher*)
      (alter *my-world* assoc
 	    :tanks (vector tank1 tank2)
 	    :current-tank 0

@@ -21,10 +21,11 @@
 	bg (.getGraphics simg)
 	sx1 (* width n)
 	sx2 (+ sx1 width)]
-    (.drawImage bg img
+    (doto bg
+      (.drawImage img
 		0 0 new-width new-height
 		sx1 0 sx2 height nil)
-    (.dispose bg)
+      (.dispose))
     simg))
 
 (defn frame-width [src count]
