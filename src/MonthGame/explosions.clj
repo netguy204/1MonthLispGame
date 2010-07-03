@@ -17,8 +17,7 @@
 		time-elapsed (+ last-time-elapsed dt-secs)]
 	    (if (> time-elapsed duration)
 	      nil
-	      (assoc (Explosion. start dir drift-dist duration)
-		:time-elapsed time-elapsed))))
+	      (assoc npe :time-elapsed time-elapsed))))
   
   (draw [npe g]
 	(let [time-elapsed (or (:time-elapsed npe) 0)

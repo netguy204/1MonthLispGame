@@ -11,27 +11,89 @@
 	MonthGame.weapons)
   (:gen-class))
 
-(import '(javax.swing JFrame JPanel JButton)
+(import '(javax.swing JFrame JPanel JButton
+		      JComboBox ComboBoxModel JLabel
+		      ListCellRenderer ImageIcon)
 	'(java.awt Color Graphics Dimension BorderLayout)
 	'(java.awt.image BufferedImage)
-	'(java.awt.event ActionListener))
+	'(java.awt.event ActionListener)
+	'(javax.swing.event ListDataEvent))
 
 (defstruct world-struct
   :tanks :current-tank :npes)
+
+(defn get-current-tank [world]
+  (nth (:tanks world) (:current-tank world)))
 
 (def *my-world* (ref (struct world-struct)))
 (def *animator* (agent nil))
 (def *last-render* (ref (System/currentTimeMillis)))
 (def *animation-sleep-ms* 50)
+(def *weapon-selector* (new JComboBox))
+(def *weapon-list-listeners* (ref []))
+
+(defn num-weapons [tank]
+  (count (:weapons tank)))
+
+(defn notify-weapon-listeners []
+  (dosync
+   (let [ev (ListDataEvent. *my-world* (. ListDataEvent CONTENTS_CHANGED) 0 
+			    (num-weapons @(get-current-tank @*my-world*)))]
+     (dorun
+      (for [listener @*weapon-list-listeners*]
+	(.contentsChanged listener ev))))))
+
+(def *weapon-list-model*
+     (proxy [ComboBoxModel] []
+       (getSelectedItem 
+	[] 
+	(dosync
+	 (:current-weapon @(get-current-tank @*my-world*))))
+
+       (setSelectedItem
+	[item] 
+	(dosync
+	 (alter (get-current-tank @*my-world*)
+		assoc :current-weapon (int item))))
+
+       (addListDataListener
+	[l]
+	(dosync (alter *weapon-list-listeners*
+		       concat [l])))
+
+       (removeListDataListener 
+	[l]
+	(dosync (ref-set *weapon-list-listeners*
+			 (filter #(not= % l)
+				 *weapon-list-listeners*))))
+
+       (getElementAt [idx] idx)
+
+       (getSize [] 
+		(dosync (num-weapons @(get-current-tank @*my-world*))))))
+
+(def *weapon-list-renderer*
+     (proxy [ListCellRenderer] []
+       (getListCellRendererComponent 
+	[l o idx selected focused]
+	(dosync
+	 (let [wpn (get-default-weapon
+		    @(get-current-tank @*my-world*))
+	       icn (new ImageIcon (icon wpn))
+	       lbl (new JLabel icn)]
+	   (if focused
+	     (doto lbl
+	       (.setBackground (.getSelectionBackground l))
+	       (.setForeground (.getSelectionForeground l)))
+	     (doto lbl
+	       (.setBackground (.getBackground l))
+	       (.setForeground (.getForeground l)))))))))
 
 (defn update-render-time []
   (dosync
    (let [old @*last-render*
 	 new (ref-set *last-render* (System/currentTimeMillis))]
      (- new old))))
-
-(defn get-current-tank [world]
-  (nth (:tanks world) (:current-tank world)))
 
 (defn make-next-tank-current [world]
   (let [ntanks (count (:tanks world))
@@ -48,6 +110,23 @@
 		     (format "Move energy:     %.1f" move)
 		     (format "Fire energy:       %.1f" fire))))
 
+
+(defn slope-of-vec [v]
+  (let [[x y] v]
+    (/ y x)))
+
+;(defn line-endpoint [pos dir lower-right]
+;  (let [[mx my] lower-right
+;	[dx dy] (vsub lower-right pos)
+;	[px py] pos
+;	slope (slope-of-vec dir)
+;	fx (]
+    
+(defn draw-background [g width height]
+  (.setColor g (. Color blue))
+  (dorun
+   (for [ii (range 30)]
+     (.drawLine g 0 (* ii 50) width (* ii 50)))))
   
 (defn my-draw [g this world]
   (let [width (.getWidth this)
@@ -61,11 +140,9 @@
      (doto bg
        (.setColor (. Color white))
        (.fillRect 0 0 width height)
-       (.setColor (. Color black)))
-     (.setColor bg (. Color blue))
-     (dorun
-	 (for [ii (range 30)]
-	   (.drawLine bg 0 (* ii 50) width (* ii 50))))
+       (.setColor (. Color black))
+       (draw-background width height))
+
      ;; draw pointer
      (if (:pos @*mouse*)
        (draw-circle bg (:pos @*mouse*) 30 30))
@@ -101,7 +178,7 @@
 			rw (.getWidth rocket)
 			rh (.getHeight rocket)]
 		    (doto bg
-		      (.drawImage rocket 0 0 32 32 0 0 rw rh)
+		      (.drawImage rocket 0 0 32 32 0 0 rw rh nil)
 		      (.dispose))
 		    img))
 
@@ -114,14 +191,11 @@
 (defn charge-for-fire [tank dt-secs]
    (let [was-charging (= (:state tank) :charging)
 	 tank (assoc tank :state :charging)
-	 max-range (range-for-energy (:weapon tank) (:fire-energy tank))]
+	 max-range (range-for-energy (get-default-weapon tank) (:fire-energy tank))]
      (if was-charging
        (assoc tank :charge 
 	      (min max-range (+ (:charge tank) (* dt-secs (:charge-rate tank)))))
        (assoc tank :charge 0))))
-
-(defn get-default-weapon [tank]
-  (:weapon tank))
 
 (defn fire-from-tank [tank world]
   (let [target (tank-target-pos @tank)
@@ -154,7 +228,8 @@
 
 (defn change-player [world]
   (alter (get-current-tank @world) reset-tank-energy)
-  (alter world make-next-tank-current))
+  (alter world make-next-tank-current)
+  (notify-weapon-listeners))
   
 (defn animation [x panel world]
   (let [dt (update-render-time)
@@ -175,7 +250,7 @@
     (.repaint panel)
     (Thread/sleep (max 0 (- *animation-sleep-ms* dt)))
     (send-off *agent* #'animation panel world)))
-
+       
 (defn -main [& args]
   (let [img-stream (get-resource "MonthGame/tanksprite.png")
 	frames (load-sprites img-stream 128)
@@ -194,8 +269,8 @@
 
     ; add the players to the world
     (dosync
-     (alter tank1 assoc :weapon *missile-launcher*)
-     (alter tank2 assoc :weapon *missile-launcher*)
+     (alter tank1 assoc :weapons [*missile-launcher*] :current-weapon 0)
+     (alter tank2 assoc :weapons [*missile-launcher*] :current-weapon 0)
      (alter *my-world* assoc
 	    :tanks (vector tank1 tank2)
 	    :current-tank 0
@@ -207,10 +282,15 @@
       (.addMouseListener mouse-adapter)
       (.addMouseMotionListener mouse-adapter)
       (.addMouseWheelListener mouse-adapter))
+    
+    ;; set up the weapon selector
+    (.setModel *weapon-selector* *weapon-list-model*)
+    (.setRenderer *weapon-selector* *weapon-list-renderer*)
 
     (doto main-window
       (.setSize 800 600)
       (.add panel (. BorderLayout CENTER))
+      (.add *weapon-selector* (. BorderLayout NORTH))
       (.add end-turn-button (. BorderLayout SOUTH))
       (.setDefaultCloseOperation (. JFrame EXIT_ON_CLOSE))
       (.setVisible true))

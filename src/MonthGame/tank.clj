@@ -14,7 +14,8 @@
   :rotate-rate :move-rate
   :move-energy :fire-energy
   :max-move-energy :max-fire-energy
-  :charge :charge-rate :weapon :state)
+  :charge :charge-rate
+  :weapons :current-weapon :state)
 
 (defn reset-tank-energy [tank]
   (assoc tank
@@ -30,6 +31,9 @@
 
 (defn frame-angle-tolerance [tank]
   (rad-per-frame (num-frames tank)))
+
+(defn get-default-weapon [tank]
+  (nth (:weapons tank) (:current-weapon tank)))
 
 (defn make-tank [frames doto angle pos]
   (let [width (.getWidth (first frames))
@@ -48,7 +52,8 @@
 	    rotate-rate move-rate
 	    move-energy fire-energy
 	    move-energy fire-energy
-	    fire-charge charge-rate nil :idle)))
+	    fire-charge charge-rate
+	    nil nil :idle)))
 
 (defn tank-target-pos [tank]
   (let [angle (discretize-angle (:angle tank)
@@ -59,7 +64,8 @@
 
 (defn draw-tank-meta [g tank]
   (let [target (tank-target-pos tank)
-	max-fire-range (range-for-energy (:weapon tank) (:fire-energy tank))]
+	max-fire-range (range-for-energy (get-default-weapon tank)
+					 (:fire-energy tank))]
     (doto g
       ;(.setColor (. Color black))
       ;(draw-leader (:pos tank) 50 (:angle tank))

@@ -24,7 +24,7 @@
 		newpos (vadd pos (vmul dir scale))]
 	    (if (is-past? end pos dir)
 	      (make-explosion end dir)
-	      (Rocket. start end speed newpos))))
+	      (assoc npe :pos newpos))))
   
   (draw [npe g]
 	(let [dir (unit-vector (vsub end start))

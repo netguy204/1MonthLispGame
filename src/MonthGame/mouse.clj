@@ -31,7 +31,7 @@
 (def mouse-adapter
      (proxy [MouseAdapter] []
        (mouseClicked [e] (println "clicked"))
-       (mouseDragged [e] (println "dragged"))
+       (mouseDragged [e] (update-mouse e :motion))
        (mouseEntered [e] (update-mouse e :enter))
        (mouseExited [e] (update-mouse e :exit))
        (mouseMoved [e] (update-mouse e :motion))
