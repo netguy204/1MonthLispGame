@@ -252,7 +252,7 @@
     (dosync
      (alter tank1 assoc
 	    :weapons [(make-rocket-launcher 5)
-		      (make-rocket-launcher 10)]
+		      (make-multirocket-launcher 10 5)]
 	    :current-weapon 0)
      (alter tank2 assoc
 	    :weapons [(make-rocket-launcher 7)]

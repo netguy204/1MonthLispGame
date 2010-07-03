@@ -52,25 +52,29 @@
 
 (def *max-speed* 300)
 
+(defn load-icon-file [fname]
+  (let [img (new BufferedImage 64 64
+		 (. BufferedImage TYPE_INT_ARGB))
+	bg (.getGraphics img)
+	rocket (load-img (get-resource fname))
+	rw (.getWidth rocket)
+	rh (.getHeight rocket)]
+    (doto bg
+      (.drawImage rocket 0 0 64 64 0 0 rw rh nil)
+      (.dispose))
+    img))
+
+(def *rocket-icon* (load-icon-file "MonthGame/rocketicon.png"))
+
 (defrecord RocketLauncher
   [rockets]
 
   Weapon
   (fire [wpn pos target]
 	(alter rockets dec)
-	(make-rocket pos target *max-speed*))
+	[(make-rocket pos target *max-speed*)])
   
-  (icon [wpn]
-	(let [img (new BufferedImage 32 32
-		       (. BufferedImage TYPE_INT_ARGB))
-	      bg (.getGraphics img)
-	      rocket (first *rocket-frames*)
-	      rw (.getWidth rocket)
-	      rh (.getHeight rocket)]
-	  (doto bg
-	    (.drawImage rocket 0 0 32 32 0 0 rw rh nil)
-	    (.dispose))
-	  img))
+  (icon [wpn] *rocket-icon*)
   
   (shots [wpn] @rockets)
 
@@ -83,3 +87,34 @@
 (defn make-rocket-launcher [rockets]
   (let [r (ref rockets)]
     (RocketLauncher. r)))
+
+(def *multirocket-icon* (load-icon-file "MonthGame/multirocketicon.png"))
+
+(def *speed-spread* 200)
+
+(defn rand-around-zero [max]
+  (- (/ max 2) (rand-int max)))
+
+(defrecord MultiRocketLauncher
+  [rockets salvo-size]
+
+  Weapon
+  (fire [wpn pos target]
+	(alter rockets dec)
+	(let [rands (repeatedly salvo-size #(rand-around-zero *speed-spread*))
+	      sorted (sort rands)]
+	  (map #(make-rocket pos target (+ *max-speed* %)) sorted)))
+				
+  (icon [wpn] *multirocket-icon*)
+  
+  (shots [wpn] @rockets)
+
+  (range-for-energy [wpn energy] 
+		    (* 10 energy))
+  
+  (energy-used [wpn pos target]
+	       (/ (vdist pos target) 10)))
+
+(defn make-multirocket-launcher [rockets salvo-size]
+  (let [r (ref rockets)]
+    (MultiRocketLauncher. r salvo-size)))
