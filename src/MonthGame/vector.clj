@@ -14,24 +14,24 @@
 
 (defn vint [v]
   (let [[x y] v]
-    (list (int (Math/round (double x)))
+    (vector (int (Math/round (double x)))
 	  (int (Math/round (double y))))))
 
 (defn vmul [v s]
   (let [[x y] v]
-    (list (* x s) (* y s))))
+    (vector (* x s) (* y s))))
 
 (defn vadd [v1 v2]
   (let [[x1 y1] v1
 	[x2 y2] v2]
-    (list (+ x1 x2) (+ y1 y2))))
+    (vector (+ x1 x2) (+ y1 y2))))
 
 (defn neg [n]
   (- 0 n))
 
 (defn vneg [v]
   (let [[x y] v]
-    (list (neg x) (neg y))))
+    (vector (neg x) (neg y))))
 
 (defn vsub [v1 v2]
   (vadd v1 (vneg v2)))
@@ -52,8 +52,8 @@
 (defn unitdir [theta]
   (let [s (Math/sin theta)
 	c (Math/cos theta)]
-  (unit-vector (list (* c 2) s))))
+  (unit-vector (vector (* c 2) s))))
 
 (defn point-to-vec [pt]
-     (list (.getX pt) (.getY pt)))
+     (vector (.getX pt) (.getY pt)))
 

@@ -6,6 +6,10 @@
 	'(java.io File)
 	'(javax.imageio ImageIO))
 
+(defn get-resource [file]
+  (let [loader (clojure.lang.RT/baseLoader)]
+    (.getResourceAsStream loader file)))
+
 (defn load-img [stream]
   (ImageIO/read stream))
 
