@@ -50,8 +50,10 @@
 
 (defn angle-to-frame [angle total]
   (let [frame (int (Math/round (/ angle (rad-per-frame total))))]
-    (if (>= frame total) (- frame total)
-	frame)))
+    (cond
+     (>= frame total) (- frame total)
+     (< frame 0) (+ frame total)
+     true frame)))
 
 (defn discretize-angle [angle total]
   (frame-to-angle (angle-to-frame angle total) total))

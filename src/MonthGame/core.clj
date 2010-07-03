@@ -44,10 +44,45 @@
       (for [npe (:npes world)]
 	(draw npe g))))
 
+(def *explode-frames*
+     (let [img-stream (get-resource "MonthGame/explode.png")]
+       (load-sprites img-stream 64)))
+
+(defrecord Explosion
+  [start dir drift-dist duration]
+
+  NPE
+  (update [npe world dt-secs]
+	  (let [last-time-elapsed (or (:time-elapsed npe) 0)
+		time-elapsed (+ last-time-elapsed dt-secs)]
+	    (if (> time-elapsed duration)
+	      nil
+	      (assoc (Explosion. start dir drift-dist duration)
+		:time-elapsed time-elapsed))))
+  
+  (draw [npe g]
+	(let [time-elapsed (or (:time-elapsed npe) 0)
+	      num-frames (count *explode-frames*)
+	      time-per-frame (/ (float duration) num-frames)
+	      current-frame-no (int (Math/floor (/ time-elapsed time-per-frame)))
+	      current-frame (nth *explode-frames* current-frame-no)
+	      offset (list (/ (.getWidth current-frame) 2)
+			   (/ (.getHeight current-frame) 2))
+	      pos (vint (vsub (position npe) offset))]
+	  (draw-img g current-frame pos)))
+  
+  (position [npe]
+	    (let [time-elapsed (or (:time-elapsed npe) 0)
+		  drift-speed (/ (float drift-dist) duration)]
+	      (vint (vadd start (vmul dir (* time-elapsed drift-speed)))))))
+	    
+(defn make-explosion [pos dir]
+  (println "making explosion")
+  (Explosion. pos dir 60 1))
+
 (def *rocket-frames*
-     (let [img-stream (get-resource "MonthGame/rocketsprite.png")
-	   frames (load-sprites img-stream 64)]
-       frames))
+     (let [img-stream (get-resource "MonthGame/rocketsprite.png")]
+       (load-sprites img-stream 64)))
 
 (defrecord Rocket
   [start end speed pos]
@@ -60,7 +95,7 @@
 		scale (* speed dt-secs)
 		newpos (vadd pos (vmul dir scale))]
 	    (if (is-past? end pos dir)
-	      nil
+	      (make-explosion end dir)
 	      (Rocket. start end speed newpos))))
   
   (draw [npe g]
@@ -71,7 +106,7 @@
 	      off (list (/ (.getWidth frame) 2) (/ (.getHeight frame) 2))
 	      tgt (vint (vsub pos off))]
 	  (draw-img g frame tgt)))
-  
+
   (position [npe] pos))
 
 (defn make-rocket [start end]
@@ -229,7 +264,7 @@
       (.setSize 800 600)
       (.add panel (. BorderLayout CENTER))
       (.add end-turn-button (. BorderLayout SOUTH))
-      ;(.setDefaultCloseOperation (. JFrame EXIT_ON_CLOSE))
+      (.setDefaultCloseOperation (. JFrame EXIT_ON_CLOSE))
       (.setVisible true))
 
     (send-off *animator* animation panel *my-world*)))
