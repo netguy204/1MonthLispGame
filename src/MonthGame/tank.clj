@@ -76,9 +76,18 @@
       (draw-circle (:pos tank) (:move-energy tank) 30))
 
     (if (= (:state tank) :charging)
-      (doto g
-	(.setColor (. Color red))
-	(draw-circle target (max 30 (* 0.25 (:charge tank))) 30)))))
+      (let [scale (max 30 (* 0.25 (:charge tank)))
+	    d1 (vmul (unitdir (/ Math/PI 4)) scale)
+	    d2 (vmul (unitdir (neg (/ Math/PI 4))) scale)
+	    l1a (vsub target d1)
+	    l1b (vadd target d1)
+	    l2a (vsub target d2)
+	    l2b (vadd target d2)]
+	(doto g
+	  (.setColor (. Color red))
+	  (draw-line l1a l1b)
+	  (draw-line l2a l2b)
+	  (draw-circle target scale 30))))))
     
 (defn draw-tank [g tank]
   (let [frame (angle-to-frame (:angle tank) (num-frames tank))

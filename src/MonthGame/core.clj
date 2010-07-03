@@ -13,7 +13,8 @@
 
 (import '(javax.swing JFrame JPanel JButton
 		      JComboBox ComboBoxModel JLabel
-		      ListCellRenderer ImageIcon)
+		      ListCellRenderer ImageIcon
+		      SwingConstants)
 	'(java.awt Color Graphics Dimension BorderLayout)
 	'(java.awt.image BufferedImage)
 	'(java.awt.event ActionListener)
@@ -77,11 +78,11 @@
        (getListCellRendererComponent 
 	[l o idx selected focused]
 	(dosync
-	 (let [wpn (get-default-weapon
-		    @(get-current-tank @*my-world*))
+	 (let [wpn (nth (:weapons @(get-current-tank @*my-world*)) o)
 	       icn (new ImageIcon (icon wpn))
-	       lbl (new JLabel icn)]
-	   (if focused
+	       lbl (new JLabel (str (shots wpn)) icn (. SwingConstants LEFT))]
+	   (.setOpaque lbl true)
+	   (if selected
 	     (doto lbl
 	       (.setBackground (.getSelectionBackground l))
 	       (.setForeground (.getSelectionForeground l)))
@@ -165,29 +166,6 @@
     (.dispose bg)
     (.drawImage g img 0 0 nil)))
 
-(def *missile-launcher*
-     (reify Weapon
-	    (fire [wpn pos target]
-		  (make-rocket pos target))
-
-	    (icon [wpn]
-		  (let [img (new BufferedImage 32 32
-				 (. BufferedImage TYPE_INT_ARGB))
-			bg (.getGraphics img)
-			rocket (first *rocket-frames*)
-			rw (.getWidth rocket)
-			rh (.getHeight rocket)]
-		    (doto bg
-		      (.drawImage rocket 0 0 32 32 0 0 rw rh nil)
-		      (.dispose))
-		    img))
-
-	    (range-for-energy [wpn energy] 
-			      (* 10 energy))
-
-	    (energy-used [wpn pos target]
-			 (/ (vdist pos target) 10))))
-
 (defn charge-for-fire [tank dt-secs]
    (let [was-charging (= (:state tank) :charging)
 	 tank (assoc tank :state :charging)
@@ -204,12 +182,15 @@
 	npe (fire weapon pos target)]
     (add-npe-to-world npe world)
     (alter tank subtract-fire-energy (energy-used weapon pos target))
-    (alter tank assoc :state :idle)))
+    (alter tank assoc :state :idle)
+    (notify-weapon-listeners)))
     
 (defn animate-tank [tank mouse world dt-secs]
   (cond
    ;; charge when right mouse depressed
-   (and (:button2down mouse) (can-fire? @tank))
+   (and (:button2down mouse)
+	(can-fire? @tank)
+	(> (shots (get-default-weapon @tank)) 0))
    (do
      (alter tank charge-for-fire dt-secs))
    
@@ -269,8 +250,13 @@
 
     ; add the players to the world
     (dosync
-     (alter tank1 assoc :weapons [*missile-launcher*] :current-weapon 0)
-     (alter tank2 assoc :weapons [*missile-launcher*] :current-weapon 0)
+     (alter tank1 assoc
+	    :weapons [(make-rocket-launcher 5)
+		      (make-rocket-launcher 10)]
+	    :current-weapon 0)
+     (alter tank2 assoc
+	    :weapons [(make-rocket-launcher 7)]
+	    :current-weapon 0)
      (alter *my-world* assoc
 	    :tanks (vector tank1 tank2)
 	    :current-tank 0

@@ -19,5 +19,6 @@
 	(draw npe g))))
 
 (defn add-npe-to-world [npe world]
-  (alter world assoc :npes (cons npe (:npes @world))))
-
+  (if (list? npe)
+    (alter world assoc :npes (concat npe (:npes @world)))
+    (alter world assoc :npes (cons npe (:npes @world)))))
