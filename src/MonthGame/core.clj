@@ -10,13 +10,21 @@
 	'(javax.imageio ImageIO)
 	'(java.awt.event MouseAdapter MouseEvent ActionListener))
 
-(def running true)
-
 ;; agent to handle issuing the repaints
 (def animator (agent nil))
+
+(def last-render (ref (System/currentTimeMillis)))
+
+(defn update-render-time []
+  (dosync
+   (let [old @last-render
+	 new (ref-set last-render (System/currentTimeMillis))]
+     (- new old))))
+
 (def animation-sleep-ms 50)
 
-; oto = offset to origin center of mass - top left corner of sprite
+;oto = offset to origin
+;center of mass - top left corner of sprite
 (defstruct tank-struct
   :angle :pos :oto :sprites
   :rotate-rate :move-rate
@@ -33,8 +41,9 @@
   (mod (+ n 1) max))
 
 (defn make-next-tank-current [world]
-  (assoc world :current-tank
-	 (incr-cyclic (:current-tank world) (count (:tanks world)))))
+  (let [ntanks (count (:tanks world))
+	next (incr-cyclic (:current-tank world) ntanks)]
+    (assoc world :current-tank next)))
 
 (defn reset-tank-energy [tank]
   (assoc tank
@@ -56,8 +65,8 @@
 	height (.getHeight (first frames))
 	midsprite (list (/ width 2) (/ height 2))
 	oto (vadd midsprite doto)
-	rotate-rate 0.01
-	move-rate 0.7
+	rotate-rate (* Math/PI 0.25)
+	move-rate 10
 	move-energy 100
 	fire-energy 200]
 
@@ -87,14 +96,20 @@
 	y0 (+ y height)]
     (dorun
      (for [lineno (range (count lines))]
-       (.drawString g (nth lines lineno) x (+ y0 (int (Math/ceil (* lineno height)))))))))
+       (let [ly (+ y0 (* lineno height))
+	     line (nth lines lineno)]
+	 (.drawString g	line x ly))))))
 
 (defn draw-hud [g world]
-  (let [current (get-current-tank world)]
+  (let [current (get-current-tank world)
+	player (+ 1 (:current-tank world))
+	move (float (:move-energy @current))
+	fire (float (:fire-energy @current))]
     (draw-text-lines g 0 0
-		     (format "Current player: %d" (+ 1 (:current-tank world)))
-		     (format "Move energy: %.1f" (float (:move-energy @current)))
-		     (format "Fire energy: %.1f" (float (:fire-energy @current))))))
+		     (format "Current player: %d" player)
+		     (format "Move energy: %.1f" move)
+		     (format "Fire energy: %.1f" fire))))
+
   
 (defstruct mouse-struct :pos :button1down :button2down :lastevent)
 
@@ -112,8 +127,8 @@
 	height (.getHeight this)
 	img (new BufferedImage width height
 		 (. BufferedImage TYPE_INT_ARGB))
-	bg (.getGraphics img)
-	o (list 64 64)]
+	bg (.getGraphics img)]
+
     (dosync
      ;; clear backgroud
      (doto bg
@@ -141,10 +156,14 @@
     (.drawImage g img 0 0 nil)))
 
 
+(defn button-to-sym [button]
+  (cond
+   (= button (. MouseEvent BUTTON1)) :button1down
+   (= button (. MouseEvent BUTTON2)) :button2down))
+  
 (defn update-click [mouse ev down]
   (let [button (.getButton ev)
-	buttonsym (cond (= button (. MouseEvent BUTTON1)) :button1down
-			(= button (. MouseEvent BUTTON2)) :button2down)]
+	buttonsym (button-to-sym button)]
     (if buttonsym (alter mouse assoc buttonsym down))))
   
 (defn update-mouse [ev type]
@@ -152,8 +171,10 @@
    (alter mouse assoc :lastevent ev)
    (cond
     (= type :exit) (alter mouse assoc :pos nil)
-    (= type :enter) (alter mouse assoc :pos (point-to-vec (.getPoint ev)))
-    (= type :motion) (alter mouse assoc :pos (point-to-vec (.getPoint ev)))
+    (= type :enter) (alter mouse assoc
+			   :pos (point-to-vec (.getPoint ev)))
+    (= type :motion) (alter mouse assoc
+			    :pos (point-to-vec (.getPoint ev)))
     (= type :pressed) (update-click mouse ev true)
     (= type :released) (update-click mouse ev false))))
    
@@ -183,7 +204,7 @@
 
 (defn subtract-energy [tank energy-type factor]
   (assoc tank energy-type 
-	 (max 0 (- (energy-type tank) (* factor (:move-rate tank))))))
+	 (max 0 (- (energy-type tank) factor))))
 
 (defn subtract-move-energy [tank factor]
   (subtract-energy tank :move-energy factor))
@@ -201,30 +222,36 @@
   (and (not (can-move? tank))
        (not (can-fire? tank))))
 
-(defn move-towards-cursor [tank mouse]
+(defn move-towards-cursor [tank mouse dt]
   (let [to-mouse (vsub (:pos mouse) (:pos tank))
-	tank-dir (unitdir (discretize-angle (:angle tank) (num-frames tank)))
-	dtheta (vang to-mouse tank-dir)
-	rotate-dir (dir-to-rotate tank-dir to-mouse)]
+	tank-dir (unitdir
+		  (discretize-angle (:angle tank)
+				    (num-frames tank)))
+	dt-secs (/ (float dt) 1000)
+	dxscale (* (:move-rate tank) dt-secs)
+	rotate-dir (dir-to-rotate tank-dir to-mouse)
+	dtscale (* (:rotate-rate tank) dt-secs rotate-dir)
+	dtheta (vang to-mouse tank-dir)]
+
     ;; only move if we're not where the mouse is
     (if (> (vmag to-mouse) 50)
       (if (within dtheta (frame-angle-tolerance tank))
 	;; drive forward, we're as accurate in angle as we can be
 	(-> tank
-	    (assoc :pos (vadd (:pos tank) (vmul tank-dir (:move-rate tank))))
-	    (subtract-move-energy 1)
-	    (subtract-fire-energy 2))
-	;; turn
+	    (assoc :pos
+	      (vadd (:pos tank) (vmul tank-dir dxscale)))
+	    (subtract-move-energy dxscale)
+	    (subtract-fire-energy (* 2 dxscale)))
+	;; turn to face the cursor
 	(-> tank
 	    (assoc :angle
-	      (add-on-circle (:angle tank)
-			     (* (:rotate-rate tank) rotate-dir)))
-	    (subtract-move-energy 0.1)))
+	      (add-on-circle (:angle tank) dtscale))
+	    (subtract-move-energy (* dtscale 0.1))))
       tank)))
 	
-(defn animate-tank [tank mouse]
+(defn animate-tank [tank mouse dt]
   (if (and (:button1down mouse) (can-move? tank))
-    (move-towards-cursor tank mouse)
+    (move-towards-cursor tank mouse dt)
     tank))
 
 (defn change-player [world]
@@ -234,18 +261,19 @@
   (alter world make-next-tank-current))
   
 (defn animation [x panel world]
-  (dosync
-   (let [tank (get-current-tank @world)]
-     ;; switch players if current is out of energy
-     (if (tank-depleted? @tank)
-       (change-player world))
+  (let [dt (update-render-time)]
+    (dosync
+     (let [tank (get-current-tank @world)]
+       ;; switch players if current is out of energy
+       (if (tank-depleted? @tank)
+	 (change-player world))
 
-     ;; animate the current player
-     (alter tank animate-tank @mouse)))
+       ;; animate the current player
+       (alter tank animate-tank @mouse dt)))
 
-  (.repaint panel)
-  (Thread/sleep animation-sleep-ms)
-  (send-off *agent* #'animation panel world))
+    (.repaint panel)
+    (Thread/sleep (max 0 (- animation-sleep-ms dt)))
+    (send-off *agent* #'animation panel world)))
 
 (defn get-resource [file]
   (let [loader (clojure.lang.RT/baseLoader)]
@@ -256,17 +284,24 @@
 (defn -main [& args]
   (let [img-stream (get-resource "MonthGame/tanksprite.png")
 	frames (load-sprites img-stream 128)
-	tank1 (ref (make-tank frames '(0 15) (/ Math/PI 4) '(64 64)))
-	tank2 (ref (make-tank frames '(0 15) (/ (* 2 Math/PI) 3) '(300 300)))
+	tank1 (ref (make-tank frames '(0 15)
+			      (/ Math/PI 4) '(64 64)))
+	tank2 (ref (make-tank frames '(0 15)
+			      (/ (* 2 Math/PI) 3) '(300 300)))
 	panel (proxy [JPanel] []
 		(paint [g] (my-draw g this my-world)))
 	end-turn-button (new JButton "End Turn")
 	button-clicked (proxy [ActionListener] []
-			 (actionPerformed [ev] (dosync (change-player my-world))))
+			 (actionPerformed
+			  [ev]
+			  (dosync (change-player my-world))))
 	main-window (JFrame. "Month Game")]
 
+    ; add the players to the world
     (dosync
-     (alter my-world assoc :tanks (list tank1 tank2) :current-tank 0))
+     (alter my-world assoc
+	    :tanks (list tank1 tank2)
+	    :current-tank 0))
 
     (.addActionListener end-turn-button button-clicked)
 
