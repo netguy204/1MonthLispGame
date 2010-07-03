@@ -3,7 +3,6 @@
 ;; we're simulating orthographic with a skewed vector space
 ;; here our metric is
 ;; ds^2 = dx^2 + (2 dy)^2
-
 (defn vdot [v1 v2]
   (let [[x1 y1] v1
 	[x2 y2] v2]
@@ -56,4 +55,15 @@
 
 (defn point-to-vec [pt]
      (vector (.getX pt) (.getY pt)))
+
+(defn plane-eqn [normal position test]
+  "returns zero for points in plane"
+  (let [[nx ny] normal
+	[px py] position
+	[tx ty] test]
+    (+ (* nx (- tx px)) (* ny (- ty py)))))
+    
+(defn is-past? [target test-pt dir]
+  "is test-pt past target given it's traveling in the dir direction?"
+  (> (plane-eqn dir target test-pt) 0))
 

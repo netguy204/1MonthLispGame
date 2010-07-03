@@ -24,3 +24,12 @@
   (let [[x y] pos]
     (.drawImage g img x y nil)))
 
+(defn draw-text-lines [g x y & lines]
+  (let [height (-> g (.getFontMetrics) (.getHeight))
+	y0 (+ y height)]
+    (dorun
+     (for [lineno (range (count lines))]
+       (let [ly (+ y0 (* lineno height))
+	     line (nth lines lineno)]
+	 (.drawString g	line x ly))))))
+

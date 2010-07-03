@@ -3,14 +3,14 @@
 	MonthGame.sprite
 	MonthGame.draw
 	MonthGame.tank
-	MonthGame.scalar-math)
+	MonthGame.scalar-math
+	MonthGame.mouse)
   (:gen-class))
 
 (import '(javax.swing JFrame JPanel JButton)
 	'(java.awt Color Graphics Dimension BorderLayout)
 	'(java.awt.image BufferedImage)
-	'(javax.imageio ImageIO)
-	'(java.awt.event MouseAdapter MouseEvent ActionListener))
+	'(java.awt.event ActionListener))
 
 (defstruct world-struct
   :tanks :current-tank :npes)
@@ -28,8 +28,43 @@
 
 (defprotocol NPE
   "An entity that's not under player control"
-  (update [npe world] "update the npes position / state")
-  (draw [npe g] "draw the npe"))
+  (update [npe world dt-secs] "update the npes position / state")
+  (draw [npe g] "draw the npe")
+  (position [npe] "position of npe center-of-mass"))
+
+(defn not-nil? [obj]
+  (not (nil? obj)))
+
+(defn update-npes [world dt-secs]
+  (alter world assoc
+	 :npes (filter not-nil? (map #(update % @world dt-secs) (:npes @world)))))
+
+(defn draw-npes [g world]
+  (dorun
+      (for [npe (:npes world)]
+	(draw npe g))))
+
+(defrecord Bullet
+  [start end speed pos]
+
+  NPE
+  (update [npe world dt-secs]
+	  (let [to-end (vsub end start)
+		dist-to-end (vmag to-end)
+		dir (unit-vector to-end)
+		scale (* speed dt-secs)
+		newpos (vadd pos (vmul dir scale))]
+	    (if (is-past? end pos dir)
+	      nil
+	      (Bullet. start end speed newpos))))
+
+  (draw [npe g]
+	(draw-circle g pos 10 10))
+
+  (position [npe] pos))
+
+(defn make-bullet [start end]
+  (Bullet. start end (* 0.5 (vdist start end)) start))
 
 (defn get-current-tank [world]
   (nth (:tanks world) (:current-tank world)))
@@ -38,15 +73,6 @@
   (let [ntanks (count (:tanks world))
 	next (incr-cyclic (:current-tank world) ntanks)]
     (assoc world :current-tank next)))
-
-(defn draw-text-lines [g x y & lines]
-  (let [height (-> g (.getFontMetrics) (.getHeight))
-	y0 (+ y height)]
-    (dorun
-     (for [lineno (range (count lines))]
-       (let [ly (+ y0 (* lineno height))
-	     line (nth lines lineno)]
-	 (.drawString g	line x ly))))))
 
 (defn draw-hud [g world]
   (let [current (get-current-tank world)
@@ -59,10 +85,6 @@
 		     (format "Fire energy:       %.1f" fire))))
 
   
-(defstruct mouse-struct :pos :button1down :button2down :lastevent)
-
-(def *mouse* (ref (struct mouse-struct nil false false)))
-
 (defn my-draw [g this world]
   (let [width (.getWidth this)
 	height (.getHeight this)
@@ -90,7 +112,10 @@
      ;; draw tanks
      (with-each-tank @world tank
        (draw-tank bg @tank))
-     
+
+     ;; draw npes
+     (draw-npes bg @world)
+
      ;; draw hud
      (doto bg
        (.setColor (. Color black))
@@ -99,40 +124,6 @@
     (.dispose bg)
     (.drawImage g img 0 0 nil)))
 
-
-(defn button-to-sym [button]
-  (cond
-   (= button (. MouseEvent BUTTON1)) :button1down
-   (= button (. MouseEvent BUTTON3)) :button2down))
-  
-(defn update-click [mouse ev down]
-  (let [button (.getButton ev)
-	buttonsym (button-to-sym button)]
-    (if buttonsym (alter mouse assoc buttonsym down))))
-  
-(defn update-mouse [ev type]
-  (dosync
-   (alter *mouse* assoc :lastevent ev)
-   (cond
-    (= type :exit) (alter *mouse* assoc :pos nil)
-    (= type :enter) (alter *mouse* assoc
-			   :pos (point-to-vec (.getPoint ev)))
-    (= type :motion) (alter *mouse* assoc
-			    :pos (point-to-vec (.getPoint ev)))
-    (= type :pressed) (update-click *mouse* ev true)
-    (= type :released) (update-click *mouse* ev false))))
-   
-(def mouse-adapter
-     (proxy [MouseAdapter] []
-       (mouseClicked [e] (println "clicked"))
-       (mouseDragged [e] (println "dragged"))
-       (mouseEntered [e] (update-mouse e :enter))
-       (mouseExited [e] (update-mouse e :exit))
-       (mouseMoved [e] (update-mouse e :motion))
-       (mousePressed [e] (update-mouse e :pressed))
-       (mouseReleased [e] (update-mouse e :released))
-       (mouseWheelMoved [mwe] (println "wheeled"))))
-
 (defn charge-for-fire [tank dt-secs]
    (let [was-charging (= (:state tank) :charging)
 	 tank (assoc tank :state :charging)]
@@ -140,10 +131,8 @@
        (assoc tank :charge (+ (:charge tank) (* dt-secs (:charge-rate tank))))
        (assoc tank :charge 0))))
 
-(defn make-bullet-npe [start end] nil)
-  
 (defn build-default-weapon-npe [tank target]
-  (make-bullet-npe (:pos tank) target))
+  (make-bullet (:pos tank) target))
 
 (defn fire-from-tank [tank world]
   (let [target (tank-target-pos tank)
@@ -184,6 +173,9 @@
        ;; disabled: surprising if you're not expected it
        ;(if (tank-depleted? @tank)
        ;(change-player world))
+
+       ;; update npes
+       (update-npes world dt-secs)
 
        ;; animate the current player
        (animate-tank tank @*mouse* world dt-secs)))
