@@ -16,6 +16,10 @@
     (vector (int (Math/round (double x)))
 	  (int (Math/round (double y))))))
 
+(defn vfloat [v]
+  (let [[x y] v]
+    (vector (double x) (double y))))
+
 (defn vmul [v s]
   (let [[x y] v]
     (vector (* x s) (* y s))))

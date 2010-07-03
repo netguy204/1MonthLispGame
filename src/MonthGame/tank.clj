@@ -40,7 +40,7 @@
 	move-energy 100
 	fire-energy 200
 	fire-charge 0
-	charge-rate 60]
+	charge-rate 130]
 
     (struct tank-struct 
 	    angle pos oto frames
