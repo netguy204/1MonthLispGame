@@ -1,8 +1,16 @@
 (ns MonthGame.vector)
 
+;; we're simulating orthographic with a skewed vector space
+;; here our metric is
+;; ds^2 = dx^2 + (2 dy)^2
+
+(defn vdot [v1 v2]
+  (let [[x1 y1] v1
+	[x2 y2] v2]
+    (+ (* x1 x2) (* y1 y2 4))))
+
 (defn vmag [v]
-  (let [[x y] v]
-    (Math/sqrt (+ (* x x) (* y y 4)))))
+  (Math/sqrt (vdot v v)))
 
 (defn vint [v]
   (let [[x y] v]
@@ -30,11 +38,6 @@
 
 (defn vdist [v1 v2]
   (vmag (vsub v1 v2)))
-
-(defn vdot [v1 v2]
-  (let [[x1 y1] v1
-	[x2 y2] v2]
-    (+ (* x1 x2) (* y1 y2 4))))
 
 (defn vang
   ([v] 

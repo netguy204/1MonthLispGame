@@ -69,8 +69,6 @@
 
 (defn draw-tank-meta [g tank]
   (doto g
-    (.setColor (. Color white))
-    (draw-leader (:pos tank) 50 0)
     (.setColor (. Color black))
     (draw-leader (:pos tank) 50 (:angle tank))
     (draw-circle (:pos tank) 50 30)
@@ -84,6 +82,20 @@
 	tgt (vint (vsub (:pos tank) (:oto tank)))]
     (draw-img g (nth (:sprites tank) frame) tgt)))
 
+(defn draw-text-lines [g x y & lines]
+  (let [height (-> g (.getFontMetrics) (.getHeight))
+	y0 (+ y height)]
+    (dorun
+     (for [lineno (range (count lines))]
+       (.drawString g (nth lines lineno) x (+ y0 (int (Math/ceil (* lineno height)))))))))
+
+(defn draw-hud [g world]
+  (let [current (get-current-tank world)]
+    (draw-text-lines g 0 0
+		     (format "Current player: %d" (+ 1 (:current-tank world)))
+		     (format "Move energy: %.1f" (float (:move-energy @current)))
+		     (format "Fire energy: %.1f" (float (:fire-energy @current))))))
+  
 (defstruct mouse-struct :pos :button1down :button2down :lastevent)
 
 (def mouse (ref (struct mouse-struct nil false false)))
@@ -113,13 +125,17 @@
      (if (:pos @mouse)
        (draw-circle bg (:pos @mouse) 30 30))
 
-     ;; draw tank power info
-     (with-each-tank @world tank
-       (draw-tank-meta bg @tank))
+     ;; draw current tank power info
+     (draw-tank-meta bg @(get-current-tank @world))
 
      ;; draw tanks
      (with-each-tank @world tank
-       (draw-tank bg @tank)))
+       (draw-tank bg @tank))
+     
+     ;; draw hud
+     (doto bg
+       (.setColor (. Color black))
+       (draw-hud @world)))
 
     (.dispose bg)
     (.drawImage g img 0 0 nil)))
@@ -245,15 +261,14 @@
 	panel (proxy [JPanel] []
 		(paint [g] (my-draw g this my-world)))
 	end-turn-button (new JButton "End Turn")
-	change-player-listener (proxy [ActionListener] []
-				 (actionPerformed [ev] 
-						  (dosync (change-player my-world))))
+	button-clicked (proxy [ActionListener] []
+			 (actionPerformed [ev] (dosync (change-player my-world))))
 	main-window (JFrame. "Month Game")]
 
     (dosync
      (alter my-world assoc :tanks (list tank1 tank2) :current-tank 0))
 
-    (.addActionListener end-turn-button change-player-listener)
+    (.addActionListener end-turn-button button-clicked)
 
     (doto panel
       (.addMouseListener mouse-adapter)
@@ -261,7 +276,7 @@
       (.addMouseWheelListener mouse-adapter))
 
     (doto main-window
-      (.setSize 400 400)
+      (.setSize 800 600)
       (.add panel (. BorderLayout CENTER))
       (.add end-turn-button (. BorderLayout SOUTH))
       ;(.setDefaultCloseOperation (. JFrame EXIT_ON_CLOSE))
