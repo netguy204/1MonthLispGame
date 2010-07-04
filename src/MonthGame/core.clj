@@ -107,7 +107,7 @@
 	player (+ 1 (:current-tank world))
 	move (float (:move-energy @current))
 	fire (float (:fire-energy @current))]
-    (draw-text-lines g 0 0
+    (draw-text-lines g (- 800 200) 0
 		     (format "Current player:  %d" player)
 		     (format "Move energy:     %.1f" move)
 		     (format "Fire energy:       %.1f" fire))))
@@ -123,12 +123,12 @@
 ;	[px py] pos
 ;	slope (slope-of-vec dir)
 ;	fx (]
-    
+
+(def *background-image*
+     (load-img (get-resource "MonthGame/paper.png")))
+
 (defn draw-background [g width height]
-  (.setColor g (. Color blue))
-  (dorun
-   (for [ii (range 30)]
-     (.drawLine g 0 (* ii 50) width (* ii 50)))))
+  (.drawImage g *background-image* 0 0 nil))
   
 (defn my-draw [g this world]
   (let [width (.getWidth this)
