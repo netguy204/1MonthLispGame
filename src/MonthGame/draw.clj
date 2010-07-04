@@ -7,6 +7,11 @@
     (.drawLine g ox oy fx fy)
     (list fx fy)))
 
+(defn fill-rect [g top-left bottom-right]
+  (let [[x y] top-left
+	[w h] (vsub bottom-right top-left)]
+    (.fillRect g x y w h)))
+
 (defn draw-leader [g origin length angle]
   (let [dir (unitdir angle)
 	end (vadd origin (vmul dir length))]

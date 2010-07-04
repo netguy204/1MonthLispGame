@@ -18,7 +18,8 @@
    (< age 1) (* age max-speed)
    ;; top speed
    true max-speed))
-   
+(def *rocket-radius-factor* 0.7)
+
 ;; a rocket is an unguided self-powered projectile
 (defrecord Rocket
   [start end max-speed]
@@ -49,7 +50,14 @@
   (draw-meta [npe g] nil)
 
   (position [npe]
-	    (or (:pos npe) start)))
+	    (or (:pos npe) start))
+
+  (radius [npe] (* *rocket-radius-factor*
+		   (/ (.getWidth (first *rocket-frames*)) 2)))
+
+  (can-collide? [npe]
+		(let [age (or (:age npe) 0)]
+		  (> age 1))))
 
 (defn make-rocket [start end max-speed]
   (Rocket. start end max-speed))

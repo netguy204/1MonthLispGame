@@ -36,7 +36,11 @@
   (position [npe]
 	    (let [time-elapsed (or (:time-elapsed npe) 0)
 		  drift-speed (/ (float drift-dist) duration)]
-	      (vint (vadd start (vmul dir (* time-elapsed drift-speed)))))))
+	      (vint (vadd start (vmul dir (* time-elapsed drift-speed))))))
+
+  (radius [npe] (/ (.getWidth (first *explode-frames*)) 2))
+
+  (can-collide? [npe] false))
 	    
 (defn make-explosion [pos dir]
   (println "making explosion")

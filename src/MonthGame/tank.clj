@@ -21,6 +21,49 @@
 (defn get-default-weapon [tank]
   (nth (:weapons tank) (:current-weapon tank)))
 
+(defn draw-energy-bar [tank g]
+  (let [pos (position tank)
+	radius 32
+	below (vadd pos (list (neg radius) radius))
+	width (* radius 2)
+	energy (:life-energy tank)
+	energy-width (* energy width)
+	height 10
+	br (vadd below (list width height))
+	energy-br (vadd below (list energy-width height))]
+    (doto g
+      (.setColor (. Color black))
+      (fill-rect below br)
+      (.setColor (. Color green))
+      (fill-rect below energy-br))))
+
+(defn- draw-tank-meta [tank g]
+  (let [target (tank-target-pos tank)
+	max-fire-range (range-for-energy (get-default-weapon tank)
+					 (:fire-energy tank))]
+    (doto g
+      (.setColor (. Color red))
+      (draw-circle (position tank) max-fire-range 30)
+      (.setColor (. Color blue))
+      (draw-circle (position tank) (:move-energy tank) 30))
+    
+    (if (= (:state tank) :charging)
+      (let [scale (max 30 (* 0.25 (:charge tank)))
+	    d1 (vmul (unitdir (/ Math/PI 4)) scale)
+	    d2 (vmul (unitdir (neg (/ Math/PI 4))) scale)
+	    l1a (vsub target d1)
+	    l1b (vadd target d1)
+	    l2a (vsub target d2)
+	    l2b (vadd target d2)]
+	(doto g
+	  (.setColor (. Color red))
+	  (draw-line l1a l1b)
+	  (draw-line l2a l2b)
+	  (draw-circle target scale 30))))
+    (draw-energy-bar tank g)))
+
+(def *tank-radius-factor* 0.5)
+
 ;oto = offset to origin
 ;center of mass - top left corner of sprite
 (defrecord Tank
@@ -29,39 +72,24 @@
    move-energy fire-energy
    max-move-energy max-fire-energy
    charge charge-rate
-   weapons current-weapon state]
+   weapons current-weapon
+   life-energy state]
   
   Entity
   (draw-meta [tank g]
-	     (let [target (tank-target-pos tank)
-		   max-fire-range (range-for-energy (get-default-weapon tank)
-						    (:fire-energy tank))]
-	       (doto g
-		 (.setColor (. Color red))
-		 (draw-circle (position tank) max-fire-range 30)
-		 (.setColor (. Color blue))
-		 (draw-circle (position tank) (:move-energy tank) 30))
-	       
-	       (if (= (:state tank) :charging)
-		 (let [scale (max 30 (* 0.25 (:charge tank)))
-		       d1 (vmul (unitdir (/ Math/PI 4)) scale)
-		       d2 (vmul (unitdir (neg (/ Math/PI 4))) scale)
-		       l1a (vsub target d1)
-		       l1b (vadd target d1)
-		       l2a (vsub target d2)
-		       l2b (vadd target d2)]
-		   (doto g
-		     (.setColor (. Color red))
-		     (draw-line l1a l1b)
-		     (draw-line l2a l2b)
-		     (draw-circle target scale 30))))))
-    
+	     (draw-tank-meta tank g))
+
   (draw [tank g]
 	(let [frame (angle-to-frame (:angle tank) (num-frames tank))
 	      tgt (vint (vsub (position tank) (:oto tank)))]
 	  (draw-img g (nth (:sprites tank) frame) tgt)))
 
-  (position [tank] (:pos tank)))
+  (position [tank] (:pos tank))
+  
+  (radius [tank] (* *tank-radius-factor*
+		    (/ (.getWidth (first (:sprites tank))) 2)))
+
+  (can-collide? [tank] true))
 
 (defn reset-tank-energy [tank]
   (assoc tank
@@ -81,14 +109,15 @@
 	move-energy 100
 	fire-energy 200
 	fire-charge 0
-	charge-rate 130]
+	charge-rate 130
+	life-energy 1.0]
 
     (Tank. angle pos oto frames
 	    rotate-rate move-rate
 	    move-energy fire-energy
 	    move-energy fire-energy
 	    fire-charge charge-rate
-	    nil nil :idle)))
+	    nil nil life-energy :idle)))
 
 (defn subtract-energy [tank energy-type factor]
   (assoc tank energy-type 

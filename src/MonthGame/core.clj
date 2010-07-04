@@ -168,10 +168,12 @@
 (defn charge-for-fire [tank dt-secs]
    (let [was-charging (= (:state tank) :charging)
 	 tank (assoc tank :state :charging)
-	 max-range (range-for-energy (get-default-weapon tank) (:fire-energy tank))]
+	 max-range (range-for-energy (get-default-weapon tank)
+				     (:fire-energy tank))]
      (if was-charging
        (assoc tank :charge 
-	      (min max-range (+ (:charge tank) (* dt-secs (:charge-rate tank)))))
+	      (min max-range (+ (:charge tank)
+				(* dt-secs (:charge-rate tank)))))
        (assoc tank :charge 0))))
 
 (defn fire-from-tank [tank world]
@@ -210,19 +212,38 @@
   (alter (get-current-tank @world) reset-tank-energy)
   (alter world make-next-tank-current)
   (notify-weapon-listeners))
-  
+
+(defmacro update-item [selector [var coll] & forms]
+  `(for [~var ~coll]
+     (if (~selector ~var)
+       (do ~@forms)
+       ~var)))
+
+(defn ref= [val r]
+  (= (deref r) val))
+
+(defmacro with-ref-for [val [ref coll] & forms]
+  `(dorun
+    (for [~ref ~coll]
+      (if (= (deref ~ref) ~val)
+	(do ~@forms)))))
+
 (defn animation [x panel world]
   (let [dt (update-render-time)
 	dt-secs (/ (float dt) 1000)]
     (dosync
      (let [tank (get-current-tank @world)]
-       ;; switch players if current is out of energy
-       ;; disabled: surprising if you're not expected it
-       ;(if (tank-depleted? @tank)
-       ;(change-player world))
 
        ;; update npes
        (update-npes world dt-secs)
+
+       ;; check-collisions
+       (with-each-collision [tank (map deref (:tanks @world))
+			     npe (:npes @world)]
+	 (with-ref-for tank
+	   [tank-ref (:tanks @world)]
+	   (alter tank-ref assoc
+		  :life-energy (- (:life-energy @tank-ref) (* 0.5 dt-secs)))))
 
        ;; animate the current player
        (animate-tank tank @*mouse* world dt-secs)))
