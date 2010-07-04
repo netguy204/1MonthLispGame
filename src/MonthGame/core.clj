@@ -15,7 +15,8 @@
 		      JComboBox ComboBoxModel JLabel
 		      ListCellRenderer ImageIcon
 		      SwingConstants)
-	'(java.awt Color Graphics Dimension BorderLayout)
+	'(java.awt Color Graphics Dimension 
+		   BorderLayout GridBagLayout GridBagConstraints)
 	'(java.awt.image BufferedImage)
 	'(java.awt.event ActionListener)
 	'(javax.swing.event ListDataEvent))
@@ -231,7 +232,15 @@
     (.repaint panel)
     (Thread/sleep (max 0 (- *animation-sleep-ms* dt)))
     (send-off *agent* #'animation panel world)))
-       
+
+(defn basic-gb-constraint [x y wx]
+  (let [c (new GridBagConstraints)]
+    (set! (. c fill) (. GridBagConstraints HORIZONTAL))
+    (set! (. c gridx) x)
+    (set! (. c gridy) y)
+    (set! (. c weightx) wx)
+    c))
+
 (defn -main [& args]
   (let [img-stream (get-resource "MonthGame/tanksprite.png")
 	frames (load-sprites img-stream 128)
@@ -276,8 +285,11 @@
     (doto main-window
       (.setSize 800 600)
       (.add panel (. BorderLayout CENTER))
-      (.add *weapon-selector* (. BorderLayout NORTH))
-      (.add end-turn-button (. BorderLayout SOUTH))
+      (.add (doto (new JPanel)
+	      (.setLayout (new BorderLayout))
+	      (.add *weapon-selector* (. BorderLayout LINE_START))
+	      (.add end-turn-button (. BorderLayout CENTER)))
+	    (. BorderLayout SOUTH))
       (.setDefaultCloseOperation (. JFrame EXIT_ON_CLOSE))
       (.setVisible true))
 
