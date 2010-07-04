@@ -219,9 +219,6 @@
        (do ~@forms)
        ~var)))
 
-(defn ref= [val r]
-  (= (deref r) val))
-
 (defmacro with-ref-for [val [ref coll] & forms]
   `(dorun
     (for [~ref ~coll]
@@ -252,14 +249,6 @@
     (Thread/sleep (max 0 (- *animation-sleep-ms* dt)))
     (send-off *agent* #'animation panel world)
     nil))
-
-(defn basic-gb-constraint [x y wx]
-  (let [c (new GridBagConstraints)]
-    (set! (. c fill) (. GridBagConstraints HORIZONTAL))
-    (set! (. c gridx) x)
-    (set! (. c gridy) y)
-    (set! (. c weightx) wx)
-    c))
 
 (def *my-panel*
      (proxy [JPanel] []

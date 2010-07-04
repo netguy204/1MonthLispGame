@@ -12,8 +12,7 @@
   (count (:sprites tank)))
 
 (defn tank-target-pos [tank]
-  (let [angle (discretize-angle (:angle tank)
-				(num-frames tank))
+  (let [angle (:angle tank)
 	dir (unitdir angle)
 	target (vadd (position tank) (vmul dir (:charge tank)))]
   target))
@@ -45,7 +44,9 @@
       (.setColor (. Color red))
       (draw-circle (position tank) max-fire-range 30)
       (.setColor (. Color blue))
-      (draw-circle (position tank) (:move-energy tank) 30))
+      (draw-circle (position tank) (:move-energy tank) 30)
+      (.setColor (. Color black))
+      (draw-leader (position tank) 60 (:angle tank)))
     
     (if (= (:state tank) :charging)
       (let [scale (max 30 (* 0.25 (:charge tank)))
@@ -105,8 +106,8 @@
 	midsprite (vector (/ width 2) (/ height 2))
 	oto (vadd midsprite doto)
 	rotate-rate (* Math/PI 0.25)
-	move-rate 10
-	move-energy 100
+	move-rate 50
+	move-energy 200
 	fire-energy 200
 	fire-charge 0
 	charge-rate 130
