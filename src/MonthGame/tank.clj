@@ -3,37 +3,73 @@
 	MonthGame.scalar-math
 	MonthGame.sprite
 	MonthGame.draw
+	MonthGame.entity
 	MonthGame.weapons))
 
 (import '(java.awt Color))
 
+(defn num-frames [tank]
+  (count (:sprites tank)))
+
+(defn tank-target-pos [tank]
+  (let [angle (discretize-angle (:angle tank)
+				(num-frames tank))
+	dir (unitdir angle)
+	target (vadd (position tank) (vmul dir (:charge tank)))]
+  target))
+
+(defn get-default-weapon [tank]
+  (nth (:weapons tank) (:current-weapon tank)))
+
 ;oto = offset to origin
 ;center of mass - top left corner of sprite
-(defstruct tank-struct
-  :angle :pos :oto :sprites
-  :rotate-rate :move-rate
-  :move-energy :fire-energy
-  :max-move-energy :max-fire-energy
-  :charge :charge-rate
-  :weapons :current-weapon :state)
+(defrecord Tank
+  [angle pos oto sprites
+   rotate-rate move-rate
+   move-energy fire-energy
+   max-move-energy max-fire-energy
+   charge charge-rate
+   weapons current-weapon state]
+  
+  Entity
+  (draw-meta [tank g]
+	     (let [target (tank-target-pos tank)
+		   max-fire-range (range-for-energy (get-default-weapon tank)
+						    (:fire-energy tank))]
+	       (doto g
+		 (.setColor (. Color red))
+		 (draw-circle (position tank) max-fire-range 30)
+		 (.setColor (. Color blue))
+		 (draw-circle (position tank) (:move-energy tank) 30))
+	       
+	       (if (= (:state tank) :charging)
+		 (let [scale (max 30 (* 0.25 (:charge tank)))
+		       d1 (vmul (unitdir (/ Math/PI 4)) scale)
+		       d2 (vmul (unitdir (neg (/ Math/PI 4))) scale)
+		       l1a (vsub target d1)
+		       l1b (vadd target d1)
+		       l2a (vsub target d2)
+		       l2b (vadd target d2)]
+		   (doto g
+		     (.setColor (. Color red))
+		     (draw-line l1a l1b)
+		     (draw-line l2a l2b)
+		     (draw-circle target scale 30))))))
+    
+  (draw [tank g]
+	(let [frame (angle-to-frame (:angle tank) (num-frames tank))
+	      tgt (vint (vsub (position tank) (:oto tank)))]
+	  (draw-img g (nth (:sprites tank) frame) tgt)))
+
+  (position [tank] (:pos tank)))
 
 (defn reset-tank-energy [tank]
   (assoc tank
     :move-energy (:max-move-energy tank)
     :fire-energy (:max-fire-energy tank)))
   
-(defmacro with-each-tank [world var & forms]
-  `(dorun (for [~var (:tanks ~world)]
-	   ~@forms)))
-
-(defn num-frames [tank]
-  (count (:sprites tank)))
-
 (defn frame-angle-tolerance [tank]
   (rad-per-frame (num-frames tank)))
-
-(defn get-default-weapon [tank]
-  (nth (:weapons tank) (:current-weapon tank)))
 
 (defn make-tank [frames doto angle pos]
   (let [width (.getWidth (first frames))
@@ -47,52 +83,12 @@
 	fire-charge 0
 	charge-rate 130]
 
-    (struct tank-struct 
-	    angle pos oto frames
+    (Tank. angle pos oto frames
 	    rotate-rate move-rate
 	    move-energy fire-energy
 	    move-energy fire-energy
 	    fire-charge charge-rate
 	    nil nil :idle)))
-
-(defn tank-target-pos [tank]
-  (let [angle (discretize-angle (:angle tank)
-				(num-frames tank))
-	dir (unitdir angle)
-	target (vadd (:pos tank) (vmul dir (:charge tank)))]
-  target))
-
-(defn draw-tank-meta [g tank]
-  (let [target (tank-target-pos tank)
-	max-fire-range (range-for-energy (get-default-weapon tank)
-					 (:fire-energy tank))]
-    (doto g
-      ;(.setColor (. Color black))
-      ;(draw-leader (:pos tank) 50 (:angle tank))
-      ;(draw-circle (:pos tank) 50 30)
-      (.setColor (. Color red))
-      (draw-circle (:pos tank) max-fire-range 30)
-      (.setColor (. Color blue))
-      (draw-circle (:pos tank) (:move-energy tank) 30))
-
-    (if (= (:state tank) :charging)
-      (let [scale (max 30 (* 0.25 (:charge tank)))
-	    d1 (vmul (unitdir (/ Math/PI 4)) scale)
-	    d2 (vmul (unitdir (neg (/ Math/PI 4))) scale)
-	    l1a (vsub target d1)
-	    l1b (vadd target d1)
-	    l2a (vsub target d2)
-	    l2b (vadd target d2)]
-	(doto g
-	  (.setColor (. Color red))
-	  (draw-line l1a l1b)
-	  (draw-line l2a l2b)
-	  (draw-circle target scale 30))))))
-    
-(defn draw-tank [g tank]
-  (let [frame (angle-to-frame (:angle tank) (num-frames tank))
-	tgt (vint (vsub (:pos tank) (:oto tank)))]
-    (draw-img g (nth (:sprites tank) frame) tgt)))
 
 (defn subtract-energy [tank energy-type factor]
   (assoc tank energy-type 
@@ -115,7 +111,7 @@
        (not (can-fire? tank))))
 
 (defn move-towards-cursor [tank mouse dt-secs]
-  (let [to-mouse (vsub (:pos mouse) (:pos tank))
+  (let [to-mouse (vsub (:pos mouse) (position tank))
 	tank-dir (unitdir
 		  (discretize-angle (:angle tank)
 				    (num-frames tank)))
@@ -131,7 +127,7 @@
 	;; drive forward, we're as accurate in angle as we can be
 	(-> tank
 	    (assoc 
-		:pos (vadd (:pos tank) (vmul tank-dir dxscale))
+		:pos (vadd (position tank) (vmul tank-dir dxscale))
 		:state :moving)
 	    (subtract-move-energy dxscale)
 	    (subtract-fire-energy (* 2 dxscale)))

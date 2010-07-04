@@ -2,7 +2,7 @@
   (:use MonthGame.vector
 	MonthGame.draw
 	MonthGame.sprite
-	MonthGame.npe
+	MonthGame.entity
 	MonthGame.explosions
 	MonthGame.weapons))
 
@@ -21,7 +21,7 @@
    
 ;; a rocket is an unguided self-powered projectile
 (defrecord Rocket
-  [start end max-speed pos]
+  [start end max-speed]
   
   NPE
   (update [npe world dt-secs]
@@ -31,24 +31,28 @@
 		dist-to-end (vmag to-end)
 		dir (unit-vector to-end)
 		scale (* (rocket-spd-eqn age max-speed) dt-secs)
-		newpos (vadd pos (vmul dir scale))]
-	    (if (is-past? end pos dir)
+		newpos (vadd (position npe) (vmul dir scale))]
+	    (if (is-past? end (position npe) dir)
 	      (make-explosion end dir)
 	      (assoc npe :pos newpos :age age))))
   
+  Entity
   (draw [npe g]
 	(let [dir (unit-vector (vsub end start))
 	      angle (vang dir)
 	      frameno (angle-to-frame angle (count *rocket-frames*))
 	      frame (nth *rocket-frames* frameno)
 	      off (list (/ (.getWidth frame) 2) (/ (.getHeight frame) 2))
-	      tgt (vint (vsub pos off))]
+	      tgt (vint (vsub (position npe) off))]
 	  (draw-img g frame tgt)))
 
-  (position [npe] pos))
+  (draw-meta [npe g] nil)
+
+  (position [npe]
+	    (or (:pos npe) start)))
 
 (defn make-rocket [start end max-speed]
-  (Rocket. start end max-speed start))
+  (Rocket. start end max-speed))
 
 (def *max-speed* 300)
 

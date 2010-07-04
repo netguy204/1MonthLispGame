@@ -7,7 +7,7 @@
 	MonthGame.mouse
 	MonthGame.missiles
 	MonthGame.explosions
-	MonthGame.npe
+	MonthGame.entity
 	MonthGame.weapons)
   (:gen-class))
 
@@ -149,15 +149,13 @@
      (if (:pos @*mouse*)
        (draw-circle bg (:pos @*mouse*) 30 30))
 
-     ;; draw current tank power info
-     (draw-tank-meta bg @(get-current-tank @world))
+     ;; draw the meta layer
+     (with-each-entity @world entity
+       (draw-meta entity bg))
 
-     ;; draw tanks
-     (with-each-tank @world tank
-       (draw-tank bg @tank))
-
-     ;; draw npes
-     (draw-npes bg @world)
+     ;; draw the entity layer
+     (with-each-entity @world entity
+       (draw entity bg))
 
      ;; draw hud
      (doto bg
@@ -180,8 +178,8 @@
   (let [target (tank-target-pos @tank)
 	pos (:pos @tank)
 	weapon (get-default-weapon @tank)
-	npe (fire weapon pos target)]
-    (add-npe-to-world npe world)
+	npes (fire weapon pos target)]
+    (add-npe-to-world npes world)
     (alter tank subtract-fire-energy (energy-used weapon pos target))
     (alter tank assoc :state :idle)
     (notify-weapon-listeners)))
@@ -231,7 +229,8 @@
 
     (.repaint panel)
     (Thread/sleep (max 0 (- *animation-sleep-ms* dt)))
-    (send-off *agent* #'animation panel world)))
+    (send-off *agent* #'animation panel world)
+    nil))
 
 (defn basic-gb-constraint [x y wx]
   (let [c (new GridBagConstraints)]
@@ -241,6 +240,10 @@
     (set! (. c weightx) wx)
     c))
 
+(def *my-panel*
+     (proxy [JPanel] []
+       (paint [g] (my-draw g this *my-world*))))
+
 (defn -main [& args]
   (let [img-stream (get-resource "MonthGame/tanksprite.png")
 	frames (load-sprites img-stream 128)
@@ -248,8 +251,7 @@
 			      (/ Math/PI 4) '(64 64)))
 	tank2 (ref (make-tank frames '(0 15)
 			      (/ (* 2 Math/PI) 3) '(300 300)))
-	panel (proxy [JPanel] []
-		(paint [g] (my-draw g this *my-world*)))
+	panel *my-panel*
 	end-turn-button (new JButton "End Turn")
 	button-clicked (proxy [ActionListener] []
 			 (actionPerformed
@@ -293,4 +295,5 @@
       (.setDefaultCloseOperation (. JFrame EXIT_ON_CLOSE))
       (.setVisible true))
 
-    (send-off *animator* animation panel *my-world*)))
+    (send-off *animator* animation panel *my-world*)
+    nil))

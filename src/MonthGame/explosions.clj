@@ -2,7 +2,7 @@
   (:use MonthGame.vector
 	MonthGame.draw
 	MonthGame.sprite
-	MonthGame.npe))
+	MonthGame.entity))
 
 (def *explode-frames*
      (let [img-stream (get-resource "MonthGame/explode.png")]
@@ -18,7 +18,8 @@
 	    (if (> time-elapsed duration)
 	      nil
 	      (assoc npe :time-elapsed time-elapsed))))
-  
+
+  Entity
   (draw [npe g]
 	(let [time-elapsed (or (:time-elapsed npe) 0)
 	      num-frames (count *explode-frames*)
@@ -30,6 +31,8 @@
 	      pos (vint (vsub (position npe) offset))]
 	  (draw-img g current-frame pos)))
   
+  (draw-meta [npe g] nil)
+
   (position [npe]
 	    (let [time-elapsed (or (:time-elapsed npe) 0)
 		  drift-speed (/ (float drift-dist) duration)]
