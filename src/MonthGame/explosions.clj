@@ -2,7 +2,8 @@
   (:use MonthGame.vector
 	MonthGame.draw
 	MonthGame.sprite
-	MonthGame.entity))
+	MonthGame.entity
+	MonthGame.sound))
 
 (def *explode-frames*
      (let [img-stream (get-resource "MonthGame/explode.png")]
@@ -17,7 +18,7 @@
 		time-elapsed (+ last-time-elapsed dt-secs)]
 	    (if (> time-elapsed duration)
 	      nil
-	      (assoc npe :time-elapsed time-elapsed))))
+	      (list (assoc npe :time-elapsed time-elapsed)))))
 
   Entity
   (draw [npe g]
@@ -42,6 +43,15 @@
 
   (can-collide? [npe] false))
 	    
+(def *explosion-sound* "MonthGame/explosion1.mp3")
+
 (defn make-explosion [pos dir]
   (println "making explosion")
+  (play-stream (get-resource *explosion-sound*))
   (Explosion. pos dir 60 1))
+
+(defn make-radial-explosions [pos num]
+  (play-stream (get-resource *explosion-sound*))
+  (let [skip-size (/ (* Math/PI 2) num)
+	dirs (map (fn [ii] (unitdir (* ii skip-size))) (range num))]
+    (map (fn [dir] (Explosion. pos dir 60 1)) dirs)))

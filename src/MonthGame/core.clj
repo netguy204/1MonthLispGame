@@ -8,7 +8,8 @@
 	MonthGame.missiles
 	MonthGame.explosions
 	MonthGame.entity
-	MonthGame.weapons)
+	MonthGame.weapons
+	MonthGame.sound)
   (:gen-class))
 
 (import '(javax.swing JFrame JPanel JButton
@@ -33,6 +34,7 @@
 (def *animation-sleep-ms* 50)
 (def *weapon-selector* (new JComboBox))
 (def *weapon-list-listeners* (ref []))
+(def *background-music* "MonthGame/background1.mp3")
 
 (defn num-weapons [tank]
   (count (:weapons tank)))
@@ -273,7 +275,8 @@
     (dosync
      (alter tank1 assoc
 	    :weapons [(make-rocket-launcher 5)
-		      (make-multirocket-launcher 10 5)]
+		      (make-multirocket-launcher 10 5)
+		      (make-projectile-launcher)]
 	    :current-weapon 0)
      (alter tank2 assoc
 	    :weapons [(make-rocket-launcher 7)]
@@ -304,6 +307,9 @@
 	    (. BorderLayout SOUTH))
       (.setDefaultCloseOperation (. JFrame EXIT_ON_CLOSE))
       (.setVisible true))
+
+    ;; start the background music
+    ;(play-stream (get-resource *background-music*))
 
     (send-off *animator* animation panel *my-world*)
     nil))

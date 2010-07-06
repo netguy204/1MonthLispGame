@@ -4,13 +4,14 @@
 	MonthGame.sprite
 	MonthGame.entity
 	MonthGame.explosions
-	MonthGame.weapons))
-
-(import '(java.awt.image BufferedImage))
+	MonthGame.weapons
+	MonthGame.sound))
 
 (def *rocket-frames*
      (let [img-stream (get-resource "MonthGame/rocketsprite.png")]
        (load-sprites img-stream 64)))
+
+(def *projectile-sound* "MonthGame/cannon2.mp3")
 
 (defn rocket-spd-eqn [age max-speed]
   (cond
@@ -34,8 +35,8 @@
 		scale (* (rocket-spd-eqn age max-speed) dt-secs)
 		newpos (vadd (position npe) (vmul dir scale))]
 	    (if (is-past? end (position npe) dir)
-	      (make-explosion end dir)
-	      (assoc npe :pos newpos :age age))))
+	      (list (make-explosion end dir))
+	      (list (assoc npe :pos newpos :age age)))))
   
   Entity
   (draw [npe g]
@@ -43,7 +44,7 @@
 	      angle (vang dir)
 	      frameno (angle-to-frame angle (count *rocket-frames*))
 	      frame (nth *rocket-frames* frameno)
-	      off (list (/ (.getWidth frame) 2) (/ (.getHeight frame) 2))
+	      off (middle-img frame)
 	      tgt (vint (vsub (position npe) off))]
 	  (draw-img g frame tgt)))
 
@@ -65,16 +66,7 @@
 (def *max-speed* 300)
 
 (defn load-icon-file [fname]
-  (let [img (new BufferedImage 64 64
-		 (. BufferedImage TYPE_INT_ARGB))
-	bg (.getGraphics img)
-	rocket (load-img (get-resource fname))
-	rw (.getWidth rocket)
-	rh (.getHeight rocket)]
-    (doto bg
-      (.drawImage rocket 0 0 64 64 0 0 rw rh nil)
-      (.dispose))
-    img))
+  (scale-img (load-img (get-resource fname)) 32 32))
 
 (def *rocket-icon* (load-icon-file "MonthGame/rocketicon.png"))
 
@@ -84,6 +76,7 @@
   Weapon
   (fire [wpn pos target]
 	(alter rockets dec)
+	(play-stream (get-resource *projectile-sound*))
 	[(make-rocket pos target *max-speed*)])
   
   (icon [wpn] *rocket-icon*)
@@ -102,10 +95,10 @@
 
 (def *multirocket-icon* (load-icon-file "MonthGame/multirocketicon.png"))
 
-(def *speed-spread* 200)
+(def *speed-spread* 100)
 
 (defn rand-around-zero [max]
-  (- (/ max 2) (rand-int max)))
+  (- (rand-int max) (* max 2)))
 
 (defrecord MultiRocketLauncher
   [rockets salvo-size]
@@ -113,9 +106,8 @@
   Weapon
   (fire [wpn pos target]
 	(alter rockets dec)
-	(let [rands (repeatedly salvo-size #(rand-around-zero *speed-spread*))
-	      sorted (sort rands)]
-	  (map #(make-rocket pos target (+ *max-speed* %)) sorted)))
+	(let [rands (repeatedly salvo-size #(rand-around-zero *speed-spread*))]
+	  (map #(make-rocket pos target (+ *max-speed* %)) rands)))
 				
   (icon [wpn] *multirocket-icon*)
   
@@ -130,3 +122,90 @@
 (defn make-multirocket-launcher [rockets salvo-size]
   (let [r (ref rockets)]
     (MultiRocketLauncher. r salvo-size)))
+
+
+(def *projectile-img*
+     (scale-img (load-img (get-resource "MonthGame/sphere.png")) 8 8))
+
+(def *projectile-shadow-img*
+     (scale-img (load-img (get-resource "MonthGame/sphere_shadow.png")) 16 16))
+
+(def *acceleration-of-gravity* 70.0)
+
+(defn projectile-eqn [start end age theta]
+  (let [d (vdist end start)
+	tan (Math/tan theta)
+	dir (unit-vector (vsub end start))
+	vz0 (Math/sqrt (/ (* d tan *acceleration-of-gravity*) 2))
+	z (- (* vz0 age) (* 0.5 age age *acceleration-of-gravity*))
+	plane-vel (/ vz0 tan)
+	plane-pos (vadd start (vmul dir (* plane-vel age)))]
+    (list plane-pos z)))
+	
+(defrecord Projectile
+  [start end theta]
+
+  NPE
+  (update [npe world dt-secs]
+	  (let [old-age (or (:age npe) 0)
+		age (+ old-age dt-secs)
+		[pp z] (projectile-eqn start end age theta)]
+	    (if (<= z 0)
+	      (make-radial-explosions end 5)
+	      (list (assoc npe :age age)))))
+
+  Entity
+  (draw [npe g]
+	(let [age (or (:age npe) 0)
+	      [shad-loc z] (projectile-eqn start end age theta)
+	      proj-loc (vadd shad-loc (list 0 (neg z)))
+	      off (middle-img *projectile-img*)
+	      shad-loc-off (vsub shad-loc off)
+	      proj-loc-off (vsub proj-loc off)]
+	  (draw-img g *projectile-shadow-img* (vint shad-loc-off))
+	  (draw-img g *projectile-img* (vint proj-loc-off))))
+
+  (draw-meta [npe g] nil)
+
+  (position [npe]
+	    (let [age (or (:age npe) 0)
+		  [pp z] (projectile-eqn start end age theta)]
+	      pp))
+
+  (radius [npe] (.getHeight *projectile-img*))
+
+  (can-collide? [npe]
+		(let [age (or (:age npe) 0)
+		      [shad-loc z] (projectile-eqn start end age theta)]
+		  (and (> age 1) (< z 16)))))
+
+(def *default-projectile-theta* (/ Math/PI 4))
+(def *projectile-icon* 
+     (let [img (make-img 32 32)
+	   bg (.getGraphics img)
+	   pos (vsub (middle-img img) (middle-img *projectile-img*))]
+       (doto bg
+	 (draw-img *projectile-img* pos)
+	 (.dispose))
+       img))
+     
+(defrecord ProjectileLauncher
+  []
+  
+  Weapon
+  (fire [wpn pos target]
+	(let [dir (unit-vector (vsub target pos))
+	      emit-pos (vadd pos (vadd (vmul dir 20) '(0 -10)))]
+	  (play-stream (get-resource *projectile-sound*))
+	  [(Projectile. emit-pos target *default-projectile-theta*)]))
+
+  (icon [wpn] *projectile-icon*)
+
+  (shots [wpn] 100)
+
+  (range-for-energy [wpn energy] (* energy 2))
+
+  (energy-used [wpn pos target] (/ (vdist pos target) 2)))
+	
+(defn make-projectile-launcher []
+  (ProjectileLauncher.))
