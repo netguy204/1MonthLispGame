@@ -1,6 +1,8 @@
 (ns MonthGame.sound
   (:use MonthGame.sprite))
 
+(set! *warn-on-reflection* true)
+
 (import '(javax.sound.sampled AudioFormat AudioInputStream
 			      DataLine SourceDataLine
 			      AudioSystem Line$Info
@@ -53,22 +55,22 @@
 		   (createAudioDevice))]
        device))
 
-(defn #^Byte low-byte [#^Short sh]
-  (byte (bit-and sh 2r01111111)))
+(defn low-byte [sh]
+  (byte (bit-and sh (int 127))))
 
-(defn #^Byte high-byte [#^Short sh]
-  (byte (bit-and (bit-shift-right sh 8) 2r01111111)))
+(defn high-byte [sh]
+  (byte (bit-shift-right sh 8)))
 
 (defn frames-to-bytes [frames]
   (let [nshorts (reduce (fn [l f] (+ (.getBufferLength f) l)) 0 frames)
 	nbytes (* 2 nshorts)
 	barray (make-array (Byte/TYPE) nbytes)]
     (letfn [(frame-to-bytes [offset frame]
-			   (let [buffer (.getBuffer frame)
+			   (let [buffer (shorts (.getBuffer frame))
 				 blength (.getBufferLength frame)]
 
 			     (dotimes [ii blength]
-			       (let [sh #^Short (aget buffer ii)
+			       (let [sh (aget buffer ii)
 				     ii2 (+ offset (* 2 ii))]
 				 (aset-byte barray ii2 (low-byte sh))
 				 (aset-byte barray (+ ii2 1) (high-byte sh))))
