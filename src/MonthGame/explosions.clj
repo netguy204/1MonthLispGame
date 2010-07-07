@@ -43,15 +43,16 @@
 
   (can-collide? [npe] false))
 	    
-(def *explosion-sound* "MonthGame/explosion1.mp3")
+(def *explosion-sound*
+     (read-frames (get-resource "MonthGame/explosion1.mp3")))
 
 (defn make-explosion [pos dir]
   (println "making explosion")
-  (play-stream (get-resource *explosion-sound*))
+  (play-async *explosion-sound*)
   (Explosion. pos dir 60 1))
 
 (defn make-radial-explosions [pos num]
-  (play-stream (get-resource *explosion-sound*))
+  (play-async *explosion-sound*)
   (let [skip-size (/ (* Math/PI 2) num)
 	dirs (map (fn [ii] (unitdir (* ii skip-size))) (range num))]
     (map (fn [dir] (Explosion. pos dir 60 1)) dirs)))

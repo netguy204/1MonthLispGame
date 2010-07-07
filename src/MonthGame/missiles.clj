@@ -11,8 +11,6 @@
      (let [img-stream (get-resource "MonthGame/rocketsprite.png")]
        (load-sprites img-stream 64)))
 
-(def *projectile-sound* "MonthGame/cannon2.mp3")
-
 (defn rocket-spd-eqn [age max-speed]
   (cond
    ;; linear acceleration
@@ -70,13 +68,16 @@
 
 (def *rocket-icon* (load-icon-file "MonthGame/rocketicon.png"))
 
+(def *projectile-sound*
+     (read-frames (get-resource "MonthGame/cannon2.mp3")))
+
 (defrecord RocketLauncher
   [rockets]
 
   Weapon
   (fire [wpn pos target]
 	(alter rockets dec)
-	(play-stream (get-resource *projectile-sound*))
+	(play-async *projectile-sound*)
 	[(make-rocket pos target *max-speed*)])
   
   (icon [wpn] *rocket-icon*)
@@ -196,7 +197,7 @@
   (fire [wpn pos target]
 	(let [dir (unit-vector (vsub target pos))
 	      emit-pos (vadd pos (vadd (vmul dir 20) '(0 -10)))]
-	  (play-stream (get-resource *projectile-sound*))
+	  (play-async *projectile-sound*)
 	  [(Projectile. emit-pos target *default-projectile-theta*)]))
 
   (icon [wpn] *projectile-icon*)
