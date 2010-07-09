@@ -17,8 +17,8 @@
   (not (nil? obj)))
 
 (defn update-npes [world dt-secs]
-  (alter world assoc
-	 :npes (filter not-nil? (mapcat #(update % @world dt-secs) (:npes @world)))))
+  (let [updates (mapcat #(update % world dt-secs) (:npes world))]
+    (assoc world :npes (filter not-nil? updates))))
 
 (defmacro with-each-collision [[a coll1 b coll2] & forms]
   `(dorun

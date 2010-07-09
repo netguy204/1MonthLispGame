@@ -39,12 +39,9 @@
   Entity
   (draw [npe g]
 	(let [dir (unit-vector (vsub end start))
-	      angle (vang dir)
-	      frameno (angle-to-frame angle (count *rocket-frames*))
-	      frame (nth *rocket-frames* frameno)
-	      off (middle-img frame)
-	      tgt (vint (vsub (position npe) off))]
-	  (draw-img g frame tgt)))
+	      sprite (make-oriented-sprite *rocket-frames* dir)
+	      pos (or (:pos npe) start)]
+	  (draw-sprite sprite g pos)))
 
   (draw-meta [npe g] nil)
 
@@ -158,13 +155,12 @@
   Entity
   (draw [npe g]
 	(let [age (or (:age npe) 0)
-	      [shad-loc z] (projectile-eqn start end age theta)
-	      proj-loc (vadd shad-loc (list 0 (neg z)))
-	      off (middle-img *projectile-img*)
-	      shad-loc-off (vsub shad-loc off)
-	      proj-loc-off (vsub proj-loc off)]
-	  (draw-img g *projectile-shadow-img* (vint shad-loc-off))
-	  (draw-img g *projectile-img* (vint proj-loc-off))))
+	      [pos z] (projectile-eqn start end age theta)
+	      sprite (make-elevated-sprite *projectile-img*
+					   *projectile-shadow-img*
+					   z)]
+	  (draw-sprite sprite g pos)))
+	  
 
   (draw-meta [npe g] nil)
 
@@ -195,9 +191,10 @@
   
   Weapon
   (fire [wpn pos target]
+	(play-async *projectile-sound*)
 	(let [dir (unit-vector (vsub target pos))
 	      emit-pos (vadd pos (vadd (vmul dir 20) '(0 -10)))]
-	  (play-async *projectile-sound*)
+	  
 	  [(Projectile. emit-pos target *default-projectile-theta*)]))
 
   (icon [wpn] *projectile-icon*)

@@ -17,7 +17,7 @@
 	target (vadd (position tank) (vmul dir (:charge tank)))]
   target))
 
-(defn get-default-weapon [tank]
+(defn default-weapon [tank]
   (nth (:weapons tank) (:current-weapon tank)))
 
 (defn draw-energy-bar [tank g]
@@ -38,7 +38,7 @@
 
 (defn- draw-tank-meta [tank g]
   (let [target (tank-target-pos tank)
-	max-fire-range (range-for-energy (get-default-weapon tank)
+	max-fire-range (range-for-energy (default-weapon tank)
 					 (:fire-energy tank))]
     (doto g
       (.setColor (. Color red))
@@ -68,7 +68,7 @@
 ;oto = offset to origin
 ;center of mass - top left corner of sprite
 (defrecord Tank
-  [angle pos oto sprites
+  [angle pos sprites
    rotate-rate move-rate
    move-energy fire-energy
    max-move-energy max-fire-energy
@@ -81,9 +81,10 @@
 	     (draw-tank-meta tank g))
 
   (draw [tank g]
-	(let [frame (angle-to-frame (:angle tank) (num-frames tank))
-	      tgt (vint (vsub (position tank) (:oto tank)))]
-	  (draw-img g (nth (:sprites tank) frame) tgt)))
+	(let [dir (unitdir angle)
+	      sprite (assoc (make-oriented-sprite (:sprites tank) dir) 
+		       :doto (:doto tank))]
+	  (draw-sprite sprite g (position tank))))
 
   (position [tank] (:pos tank))
   
@@ -101,11 +102,7 @@
   (rad-per-frame (num-frames tank)))
 
 (defn make-tank [frames doto angle pos]
-  (let [width (.getWidth (first frames))
-	height (.getHeight (first frames))
-	midsprite (vector (/ width 2) (/ height 2))
-	oto (vadd midsprite doto)
-	rotate-rate (* Math/PI 0.25)
+  (let [rotate-rate (* Math/PI 0.25)
 	move-rate 50
 	move-energy 200
 	fire-energy 200
@@ -113,12 +110,13 @@
 	charge-rate 130
 	life-energy 1.0]
 
-    (Tank. angle pos oto frames
+    (assoc (Tank. angle pos frames
 	    rotate-rate move-rate
 	    move-energy fire-energy
 	    move-energy fire-energy
 	    fire-charge charge-rate
-	    nil nil life-energy :idle)))
+	    nil nil life-energy :idle)
+      :doto doto)))
 
 (defn subtract-energy [tank energy-type factor]
   (assoc tank energy-type 

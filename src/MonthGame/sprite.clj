@@ -1,10 +1,14 @@
 (ns MonthGame.sprite
-  (:use MonthGame.vector))
+  (:use MonthGame.vector
+	MonthGame.draw))
 
 (import '(java.awt Color Graphics Dimension)
 	'(java.awt.image BufferedImage)
 	'(java.io File)
 	'(javax.imageio ImageIO))
+
+(defprotocol Sprite
+  (draw-sprite [sprt g pos] "draw a sprite to the screen"))
 
 (defn get-resource [file]
   (let [loader (clojure.lang.RT/baseLoader)]
@@ -80,3 +84,36 @@
 
 (defn unitdir-for-frame [n total]
   (unitdir (frame-to-angle n total)))
+
+(defrecord OrientedSprite
+  [frames dir]
+
+  Sprite
+  (draw-sprite
+   [sprt g pos]
+   (let [angle (vang dir)
+	 frameno (angle-to-frame angle (count frames))
+	 frame (nth frames frameno)
+	 doto (or (:doto sprt) '(0 0))
+	 off (vadd (middle-img frame) doto)
+	 tgt (vint (vsub pos off))]
+     (draw-img g frame tgt))))
+
+(defn make-oriented-sprite [frames dir]
+  (OrientedSprite. frames dir))
+
+(defrecord ElevatedSprite
+  [main shadow height]
+
+  Sprite
+  (draw-sprite
+   [sprt g pos]
+   (let [proj-loc (vadd pos (list 0 (neg height)))
+	 off (middle-img main)
+	 shad-loc-off (vsub pos off)
+	 proj-loc-off (vsub proj-loc off)]
+     (draw-img g shadow (vint shad-loc-off))
+     (draw-img g main (vint proj-loc-off)))))
+
+(defn make-elevated-sprite [main shadow height]
+  (ElevatedSprite. main shadow height))
