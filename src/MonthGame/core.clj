@@ -11,7 +11,7 @@
 	MonthGame.weapons
 	MonthGame.sound
 	MonthGame.state-machine
-	clojure.stacktrace)
+	MonthGame.util)
   (:gen-class))
 
 (import '(javax.swing JFrame JPanel JButton
@@ -122,7 +122,7 @@
 
 (defn make-next-tank-current [world]
   (let [ntanks (count (:tanks world))
-	next (incr-cyclic (:current-tank) ntanks)]
+	next (incr-cyclic (:current-tank world) ntanks)]
     (assoc world :current-tank next)))
 
 (defn draw-hud [g world]
@@ -171,15 +171,6 @@
     (.dispose bg)
     (.drawImage g img 0 0 nil)))
 
-(defmacro if-let* 
-  ([[var test] form]
-     `(if-let [~var ~test]
-	~form))
-
-  ([[var1 test1] [var2 test2] & more]
-     `(if-let [~var1 ~test1]
-	(if-let* [~var2 ~test2] ~@more))))
-       
 (def *wall-frames*
      (let [img-stream (get-resource "MonthGame/jersey_wall.png")]
        (load-sprites img-stream 160)))
@@ -204,13 +195,23 @@
   (vadd from (project-wall-towards from to)))
 
 (defn- make-wall-entity [sprite pos]
-  (reify
-   Entity
-   (draw [entity g] (draw-sprite sprite g pos))
-   (draw-meta [entity g] nil)
-   (position [entity] pos)
-   (radius [entity] 0)
-   (can-collide? [entity] false)))
+  (let [wall (reify
+	      Entity
+	      (draw [entity g] (draw-sprite sprite g pos))
+	      (draw-meta [entity g] nil)
+	      (position [entity] pos)
+	      (radius [entity] 0)
+	      (collided-with [entity other] entity))]
+    (derive (class wall) ::wall)
+    wall))
+
+(defmethod MonthGame.entity/intersect [MonthGame.missiles.Rocket ::wall] [e1 e2]
+  (if (circle-intersect e1 e2)
+    true
+    false))
+
+(defmethod MonthGame.entity/intersect [MonthGame.missiles.Projectile ::wall] [e1 e2]
+  false)
 
 (defn- make-wall-entities [from to]
   (let [proj (project-wall-towards from to)
@@ -223,13 +224,6 @@
 	step (vmul dir step-size)]
     (map #(make-wall-entity sprite %)
 	 (map #(vadd from (vmul step %)) (range steps)))))
-
-(defn zip [coll1 coll2]
-  (let [c1 (count coll1)
-	c2 (count coll2)]
-    (assert (= c1 c2))
-    (for [n (range c1)]
-      (list (nth coll1 n) (nth coll2 n)))))
 
 (defn- path-to-entities [path]
   (let [pairs (zip (drop 1 path) (drop-last path))]
@@ -314,19 +308,6 @@
   (alter world make-next-tank-current)
   (notify-weapon-listeners))
 
-(defmacro update-item [selector [var coll] & forms]
-  "replace the item found by selector with the result of executing forms"
-  `(for [~var ~coll]
-     (if (~selector ~var)
-       (do ~@forms)
-       ~var)))
-
-(defmacro with-ref-for [val [ref coll] & forms]
-  "evaluate forms with the ref (from coll) that = val"
-  `(doseq [~ref ~coll]
-      (if (= (deref ~ref) ~val)
-	(do ~@forms))))
-
 (def *my-panel*
      (proxy [JPanel] []
        (paint [g] (my-draw g this))))
@@ -339,6 +320,13 @@
     (alter *my-world* update-npes dt-secs)
     
     ;; TODO check collisions between npes and walls
+    (with-each-collision [npe (:npes @*my-world*)
+			  barrier (:barriers @*my-world*)]
+      (alter *my-world* assoc :npes
+	     (update-item #(= npe %)
+			  [old-npe (:npes @*my-world*)]
+			  (collided-with old-npe barrier))))
+
     ;; TODO check collisions between tanks and walls
 
     ;; check collisions between npes and tanks
@@ -409,14 +397,6 @@
   "useful for debugging"
   (restart-agent *animator* nil)
   (start-animation-agent))
-
-(defn- print-agent-error [agent]
-  "debugging"
-  (let [err (agent-error agent)]
-    (print-cause-trace err)))
-
-(defn- methods-to-strings [obj]
-  (map #(.getName %) (.. obj (getClass) (getMethods))))
 
 (defn- init-world []
   (let [img-stream (get-resource "MonthGame/tanksprite.png")

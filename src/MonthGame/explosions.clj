@@ -18,7 +18,7 @@
 		time-elapsed (+ last-time-elapsed dt-secs)]
 	    (if (> time-elapsed duration)
 	      nil
-	      (list (assoc npe :time-elapsed time-elapsed)))))
+	      (assoc npe :time-elapsed time-elapsed))))
 
   Entity
   (draw [npe g]
@@ -41,7 +41,7 @@
 
   (radius [npe] (/ (.getWidth (first *explode-frames*)) 2))
 
-  (can-collide? [npe] false))
+  (collided-with [npe other] npe))
 	    
 (def *explosion-sound*
      (read-frames (get-resource "MonthGame/explosion1.mp3")))

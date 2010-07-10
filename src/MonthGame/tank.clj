@@ -91,7 +91,7 @@
   (radius [tank] (* *tank-radius-factor*
 		    (/ (.getWidth (first sprites)) 2)))
 
-  (can-collide? [tank] true))
+  (collided-with [tank other] tank))
 
 (defn reset-tank-energy [tank]
   (assoc tank

@@ -1,5 +1,6 @@
 (ns MonthGame.entity
-  (:use MonthGame.vector))
+  (:use MonthGame.vector
+	MonthGame.util))
 
 (defprotocol NPE
   "An entity that's not under player control"
@@ -11,23 +12,32 @@
   (draw-meta [entity g] "draw to the meta-layer")
   (position [entity] "position of center-of-mass")
   (radius [entity] "average mass containing radius")
-  (can-collide? [entity] "true if entity can be collided with"))
+  (collided-with [entity other] "mutator called on collision"))
 
 (defn not-nil? [obj]
   (not (nil? obj)))
 
 (defn update-npes [world dt-secs]
-  (let [updates (mapcat #(update % world dt-secs) (:npes world))]
+  (let [updates (flatten (map #(update % world dt-secs) (:npes world)))]
     (assoc world :npes (filter not-nil? updates))))
 
+(defmulti intersect two-dispatch)
+
+(defn circle-intersect [e1 e2]
+  "do the circles surrounding these entities overlap?"
+  (let [r (vdist (position e1) (position e2))
+	edge-range (max 0 (- r (radius e1) (radius e2)))]
+    (zero? edge-range)))
+
+(defmethod intersect :default [e1 e2]
+  (circle-intersect e1 e2))
+
 (defmacro with-each-collision [[a coll1 b coll2] & forms]
-  `(dorun
-    (for [~a (filter can-collide? ~coll1)
-	  ~b (filter can-collide? ~coll2)]
-      (let [cm-range# (vdist (position ~a) (position ~b))
-	    edge-range# (max 0 (- cm-range# (radius ~a) (radius ~b)))]
-	(if (zero? edge-range#)
-	  (do ~@forms))))))
+  `(doseq [~a ~coll1
+	   ~b ~coll2]
+     (if (and (not (identical? ~a ~b))
+	      (intersect ~a ~b))
+	  (do ~@forms))))
 
 (defn add-npe-to-world [npe world]
   (alter world assoc :npes (concat npe (:npes @world))))

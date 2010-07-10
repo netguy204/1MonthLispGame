@@ -33,8 +33,8 @@
 		scale (* (rocket-spd-eqn age max-speed) dt-secs)
 		newpos (vadd (position npe) (vmul dir scale))]
 	    (if (is-past? end (position npe) dir)
-	      (list (make-explosion end dir))
-	      (list (assoc npe :pos newpos :age age)))))
+	      (make-explosion end dir)
+	      (assoc npe :pos newpos :age age))))
   
   Entity
   (draw [npe g]
@@ -51,9 +51,9 @@
   (radius [npe] (* *rocket-radius-factor*
 		   (/ (.getWidth (first *rocket-frames*)) 2)))
 
-  (can-collide? [npe]
-		(let [age (or (:age npe) 0)]
-		  (> age 1))))
+  (collided-with [npe other]
+		 (let [dir (unit-vector (vsub end start))]
+		   (list (make-explosion (position npe) (vneg dir))))))
 
 (defn make-rocket [start end max-speed]
   (Rocket. start end max-speed))
@@ -150,7 +150,7 @@
 		[pp z] (projectile-eqn start end age theta)]
 	    (if (<= z 0)
 	      (make-radial-explosions end 5)
-	      (list (assoc npe :age age)))))
+	      (assoc npe :age age))))
 
   Entity
   (draw [npe g]
@@ -171,10 +171,8 @@
 
   (radius [npe] (.getHeight *projectile-img*))
 
-  (can-collide? [npe]
-		(let [age (or (:age npe) 0)
-		      [shad-loc z] (projectile-eqn start end age theta)]
-		  (and (> age 1) (< z 16)))))
+  (collided-with [npe other]
+		 (make-radial-explosions (position npe) 10)))
 
 (def *default-projectile-theta* (/ Math/PI 4))
 (def *projectile-icon* 
