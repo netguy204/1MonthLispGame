@@ -71,3 +71,6 @@
   "is test-pt past target given it's traveling in the dir direction?"
   (> (plane-eqn dir target test-pt) 0))
 
+(defn vec? [v]
+  (let [[x y] v]
+    (and (number? x) (number? y))))

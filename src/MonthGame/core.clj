@@ -9,7 +9,8 @@
 	MonthGame.explosions
 	MonthGame.entity
 	MonthGame.weapons
-	MonthGame.sound)
+	MonthGame.sound
+	MonthGame.state-machine)
   (:gen-class))
 
 (import '(javax.swing JFrame JPanel JButton
@@ -169,21 +170,85 @@
     (.dispose bg)
     (.drawImage g img 0 0 nil)))
 
+(defmacro if-let* 
+  ([[var test] form]
+     `(if-let [~var ~test]
+	~form))
+
+  ([[var1 test1] [var2 test2] & more]
+     `(if-let [~var1 ~test1]
+	(if-let* [~var2 ~test2] ~@more))))
+       
+(def *wall-frames*
+     (let [img-stream (get-resource "MonthGame/jersey_wall.png")]
+       (load-sprites img-stream 160)))
+
+(defn- wall-step-mag [dir]
+  (* (.getWidth (first *wall-frames*)) 0.6))
+
+(defn- discretize-wall-mag [dir mag]
+  (let [step-size (wall-step-mag dir)
+	num-times (Math/round (/ mag step-size))]
+    (* num-times step-size)))
+
+(defn- project-wall-towards [from to]
+  (let [tovec (vsub to from)
+	dir (unit-vector tovec)
+	angle (discretize-angle (vang dir) (count *wall-frames*))
+	projdir (unitdir angle)
+	mag (vmag tovec)]
+    (vmul projdir (discretize-wall-mag dir mag))))
+
+(defn- closest-point-towards [from to]
+  (vadd from (project-wall-towards from to)))
+
+(defn- make-wall-entity [sprite pos]
+  (reify
+   Entity
+   (draw [entity g] (draw-sprite sprite g pos))
+   (draw-meta [entity g] nil)
+   (position [entity] pos)
+   (radius [entity] 0)
+   (can-collide? [entity] false)))
+
+(defn- make-wall-entities [from to]
+  (let [proj (project-wall-towards from to)
+	dir (unit-vector proj)
+	angle (vang dir)
+	sprite (make-oriented-sprite *wall-frames* dir '(0 40))
+	dist (vmag proj)
+	step-size (wall-step-mag dir)
+	steps (/ dist step-size)
+	step (vmul dir step-size)]
+    (map #(make-wall-entity sprite %)
+	 (map #(vadd from (vmul step %)) (range steps)))))
+
+(defn zip [coll1 coll2]
+  (let [c1 (count coll1)
+	c2 (count coll2)]
+    (assert (= c1 c2))
+    (for [n (range c1)]
+      (list (nth coll1 n) (nth coll2 n)))))
+
+(defn- path-to-entities [path]
+  (let [pairs (zip (drop 1 path) (drop-last path))]
+    (mapcat #(make-wall-entities (first %) (second %)) pairs)))
+
 (defn game-init-draw [g this]
   (let [width (.getWidth this)
 	height (.getHeight this)]
     (doto g
-      (.setColor (. Color blue))
-      (.fillRect 0 0 width height)
-      (.setColor (. Color white)))
-    (if-let [meta (world-mode-meta @*my-world* nil)]
-      (do
-	(println "meta: " meta)
-	(if-let [path (:path @meta)]
-	  (dorun
-	   (reduce #(do (draw-line g %1 %2) %2)
-		   (first path)
-		   (rest path))))))))
+      (game-running-draw this)
+      (.setColor (. Color black))
+      (draw-text-lines 300 0 "WORLD EDIT MODE"))
+    (if-let* 
+     [meta (world-mode-meta @*my-world* nil)]
+     [path (:path @meta)]
+     (let [walls (concat (path-to-entities path)
+			 (if-let [pos (:pos @*mouse*)]
+			   (make-wall-entities (first path) pos)))]
+       (doseq [ent (sort-by ypos-for-entity walls)]
+	 (draw ent g))))))
 
 (defn my-draw [g this]
   (dosync
@@ -263,7 +328,9 @@
     ;; update npes
     (alter *my-world* update-npes dt-secs)
     
-    ;; check-collisions
+    ;; TODO check collisions between npes and walls
+    ;; TODO check collisions between tanks and walls
+    ;; check collisions between npes and tanks
     (with-each-collision [tank (map deref (:tanks @*my-world*))
 			  npe (:npes @*my-world*)]
       (with-ref-for tank
@@ -277,9 +344,6 @@
   ; honor any changes that other logic made to state
   (world-mode @*my-world*))
 
-; state machine
-; :current-state -> (cond1) (predicate) -> next state
-;                   (cond2) (predicate) -> next state
 (def draw-walls
      {:init
       [{:cond #(:button1down @*mouse*)
@@ -288,7 +352,12 @@
       
       :wait-for-release
       [{:cond #(not (:button1down @*mouse*))
-	:action #(alter % assoc :path (cons (:pos @*mouse*) (:path (deref %))))
+	:action #(alter % assoc :path 
+			(if-let [path (:path (deref %))]
+			  (cons (closest-point-towards (first path)
+						       (:pos @*mouse*))
+				path)
+			  (list (:pos @*mouse*))))
 	:next-state :drawing-wall}
        {:default true :next-state :wait-for-release}]
 
@@ -299,31 +368,15 @@
 	:next-state nil}
        {:default true :next-state :drawing-wall}]})
 
-(defn find-first [pred coll]
-  (first (filter pred coll)))
-
-(defn- valid-transition? [transition]
-  (or (:default transition) ((:cond transition))))
-
-(defn update-state [machine transitions]
-  (let [candidates ((:state @machine) transitions)
-	match (find-first valid-transition? candidates)]
-    (if (:action match) ((:action match) machine))
-    (alter machine assoc :state (:next-state match))
-    (:next-state match)))
-
-(defn create-machine [& meta]
-  (ref (assoc (apply hash-map meta) :state :init)))
-
 (defn- init-animation [x dt-secs]
-  (let [machine (world-mode-meta @*my-world* (create-machine))]
-    (println "machine: " machine)
-    (let [next-state (update-state machine draw-walls)]
-      (println "next state: " next-state)
-      (if (nil? next-state)
-	(alter *my-world* change-world-mode :running nil)
-	(alter *my-world* change-world-mode :init machine)))))
-
+  (let [machine (world-mode-meta @*my-world* (create-machine))
+	next-state (update-state machine draw-walls)]
+    (if (nil? next-state)
+      (if-let [path (:path @machine)]
+	(do
+	  (alter *my-world* assoc :barriers (path-to-entities path))
+	  (alter *my-world* change-world-mode :running nil)))
+      (alter *my-world* change-world-mode :init machine))))
 
 (defn animation [x]
   (let [dt (update-render-time)
