@@ -37,7 +37,10 @@
     y))
 
 (defmacro with-each-entity [world var & forms]
-  `(let [entities# (sort-by ypos-for-entity
-			    (concat (map deref (:tanks ~world)) (:npes ~world)))]
+  `(let [entities#
+	 (sort-by ypos-for-entity
+		  (concat (map deref (:tanks ~world))
+			  (:npes ~world)
+			  (:barriers ~world)))]
     (doseq [~var entities#]
 	      ~@forms)))

@@ -10,7 +10,8 @@
 	MonthGame.entity
 	MonthGame.weapons
 	MonthGame.sound
-	MonthGame.state-machine)
+	MonthGame.state-machine
+	clojure.stacktrace)
   (:gen-class))
 
 (import '(javax.swing JFrame JPanel JButton
@@ -26,8 +27,18 @@
 (defrecord World
   [tanks current-tank npes])
 
-(defn- current-tank [world]
-  (nth (:tanks world) (:current-tank world)))
+(def *my-world* (ref (World. [] nil [])))
+(def *animator* (agent nil))
+(def *last-render* (ref (System/currentTimeMillis)))
+(def *animation-sleep-ms* 50)
+(def *weapon-selector* (new JComboBox))
+(def *weapon-list-listeners* (ref []))
+(def *background-music* "MonthGame/background1.mp3")
+(def *background-image*
+     (load-img (get-resource "MonthGame/paper.png")))
+
+(defn- current-tank []
+  (nth (:tanks @*my-world*) (:current-tank @*my-world*)))
 
 (defn- add-tank [world tank]
   (assoc world :tanks (cons tank (:tanks world))))
@@ -41,23 +52,13 @@
 (defn- change-world-mode [world mode meta]
   (assoc world :mode mode :mode-meta meta))
 
-(def *my-world* (ref (World. [] nil [])))
-(def *animator* (agent nil))
-(def *last-render* (ref (System/currentTimeMillis)))
-(def *animation-sleep-ms* 50)
-(def *weapon-selector* (new JComboBox))
-(def *weapon-list-listeners* (ref []))
-(def *background-music* "MonthGame/background1.mp3")
-(def *background-image*
-     (load-img (get-resource "MonthGame/paper.png")))
-
 (defn num-weapons [tank]
   (count (:weapons tank)))
 
 (defn- make-lde [world]
   (ListDataEvent. world
 		  (ListDataEvent/CONTENTS_CHANGED)
-		  0 (num-weapons @(current-tank world))))
+		  0 (num-weapons @(current-tank))))
 
 (defn- notify-weapon-listeners []
   (dosync
@@ -66,7 +67,7 @@
        (.contentsChanged listener ev)))))
 
 (defn- current-weapon [world]
-  (:current-weapon @(current-tank world)))
+  (:current-weapon @(current-tank)))
 
 (defn- remove-from-list [lst item]
   (filter #(not= % item) lst))
@@ -78,7 +79,7 @@
        (setSelectedItem
 	[item] 
 	(dosync
-	 (alter (current-tank @*my-world*)
+	 (alter (current-tank)
 		assoc :current-weapon (int item))))
 
        (addListDataListener
@@ -93,14 +94,14 @@
        (getElementAt [idx] idx)
 
        (getSize [] 
-		(dosync (num-weapons @(current-tank @*my-world*))))))
+		(dosync (num-weapons @(current-tank))))))
 
 (def *weapon-list-renderer*
      (proxy [ListCellRenderer] []
        (getListCellRendererComponent 
 	[l o idx selected focused]
 	(dosync
-	 (let [wpn (nth (:weapons @(current-tank @*my-world*)) o)
+	 (let [wpn (nth (:weapons @(current-tank)) o)
 	       icn (new ImageIcon (icon wpn))
 	       lbl (new JLabel (str (shots wpn)) icn (. SwingConstants CENTER))]
 	   (.setOpaque lbl true)
@@ -121,11 +122,11 @@
 
 (defn make-next-tank-current [world]
   (let [ntanks (count (:tanks world))
-	next (incr-cyclic (:current-tank world) ntanks)]
+	next (incr-cyclic (:current-tank) ntanks)]
     (assoc world :current-tank next)))
 
 (defn draw-hud [g world]
-  (let [current (current-tank world)
+  (let [current (current-tank)
 	player (+ 1 (:current-tank world))
 	move (float (:move-energy @current))
 	fire (float (:fire-energy @current))]
@@ -276,31 +277,40 @@
     (alter tank subtract-fire-energy (energy-used weapon pos target))
     (alter tank assoc :state :idle)
     (notify-weapon-listeners)))
-    
-(defn update-tank! [tank mouse world dt-secs]
-  (cond
-   ;; charge when right mouse depressed
-   (and (:button2down mouse)
-	(can-fire? @tank)
-	(> (shots (default-weapon @tank)) 0))
-   (do
-     (alter tank charge-for-fire dt-secs))
-   
-   ;; fire when released
-   (and (= (:state @tank) :charging) (not (:button2down mouse)))
-   (do
-     (println "firing!")
-     (fire-from-tank! tank world))
 
-   ;; move when left mouse depressed
-   (and (:button1down mouse) (can-move? @tank))
-   (do
-     (alter tank move-towards-cursor mouse dt-secs))
+(def tank-motion
+     {:init
+      [{:cond #(and (:button2down @*mouse*)
+		    (can-fire? @(current-tank))
+		    (> (shots (default-weapon @(current-tank))) 0))
+	:next-state :charging}
+       {:cond #(and (:button1down @*mouse*)
+		    (can-move? @(current-tank)))
+	:next-state :moving}
+       {:default true :next-state :init}]
 
-   true (alter tank assoc :state :idle)))
+      :moving
+      [{:cond #(:button1down @*mouse*)
+	:action (fn [m dt] (alter (current-tank) move-towards-cursor @*mouse* dt))
+	:next-state :moving}
+       {:cond #(not (:button1down @*mouse*))
+	:next-state :init}]
+
+      :charging
+      [{:cond #(:button2down @*mouse*)
+	:action (fn [m dt] (alter (current-tank) charge-for-fire dt))
+	:next-state :charging}
+       {:cond #(not (:button2down @*mouse*))
+	:action (fn [m dt] (fire-from-tank! (current-tank) *my-world*))
+	:next-state :init}]})
+	
+(defn update-tank! [tank world dt-secs]
+  (let [machine (world-mode-meta @*my-world* (create-machine))]
+    (update-state machine tank-motion dt-secs)
+    (alter *my-world* change-world-mode :running machine)))
 
 (defn change-player! [world]
-  (alter (current-tank @world) reset-tank-energy)
+  (alter (current-tank) reset-tank-energy)
   (alter world make-next-tank-current)
   (notify-weapon-listeners))
 
@@ -324,12 +334,13 @@
 (declare animation)
 
 (defn- game-animation [x dt-secs]
-  (let [tank (current-tank @*my-world*)]
+  (let [tank (current-tank)]
     ;; update npes
     (alter *my-world* update-npes dt-secs)
     
     ;; TODO check collisions between npes and walls
     ;; TODO check collisions between tanks and walls
+
     ;; check collisions between npes and tanks
     (with-each-collision [tank (map deref (:tanks @*my-world*))
 			  npe (:npes @*my-world*)]
@@ -339,7 +350,7 @@
 	       :life-energy (- (:life-energy @tank-ref) (* 0.5 dt-secs)))))
     
     ;; animate the current player
-    (update-tank! tank @*mouse* *my-world* dt-secs))
+    (update-tank! tank *my-world* dt-secs))
   
   ; honor any changes that other logic made to state
   (world-mode @*my-world*))
@@ -402,9 +413,7 @@
 (defn- print-agent-error [agent]
   "debugging"
   (let [err (agent-error agent)]
-    (println err)
-    (doseq [el (.getStackTrace err)]
-      (println el))))
+    (print-cause-trace err)))
 
 (defn- methods-to-strings [obj]
   (map #(.getName %) (.. obj (getClass) (getMethods))))
