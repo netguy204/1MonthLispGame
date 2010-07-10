@@ -86,7 +86,7 @@
   (unitdir (frame-to-angle n total)))
 
 (defrecord OrientedSprite
-  [frames dir]
+  [frames dir doto]
 
   Sprite
   (draw-sprite
@@ -94,13 +94,16 @@
    (let [angle (vang dir)
 	 frameno (angle-to-frame angle (count frames))
 	 frame (nth frames frameno)
-	 doto (or (:doto sprt) '(0 0))
 	 off (vadd (middle-img frame) doto)
 	 tgt (vint (vsub pos off))]
      (draw-img g frame tgt))))
 
-(defn make-oriented-sprite [frames dir]
-  (OrientedSprite. frames dir))
+(defn make-oriented-sprite
+  ([frames dir]
+     (make-oriented-sprite frames dir '(0 0)))
+
+  ([frames dir doto]
+  (OrientedSprite. frames dir doto)))
 
 (defrecord ElevatedSprite
   [main shadow height]

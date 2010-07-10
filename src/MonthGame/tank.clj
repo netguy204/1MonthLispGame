@@ -74,7 +74,7 @@
    max-move-energy max-fire-energy
    charge charge-rate
    weapons current-weapon
-   life-energy state]
+   life-energy doto state]
   
   Entity
   (draw-meta [tank g]
@@ -82,14 +82,14 @@
 
   (draw [tank g]
 	(let [dir (unitdir angle)
-	      sprite (assoc (make-oriented-sprite (:sprites tank) dir) 
-		       :doto (:doto tank))]
+	      sprite (make-oriented-sprite sprites dir doto)]
+		     
 	  (draw-sprite sprite g (position tank))))
 
   (position [tank] (:pos tank))
   
   (radius [tank] (* *tank-radius-factor*
-		    (/ (.getWidth (first (:sprites tank))) 2)))
+		    (/ (.getWidth (first sprites)) 2)))
 
   (can-collide? [tank] true))
 
@@ -110,13 +110,13 @@
 	charge-rate 130
 	life-energy 1.0]
 
-    (assoc (Tank. angle pos frames
-	    rotate-rate move-rate
-	    move-energy fire-energy
-	    move-energy fire-energy
-	    fire-charge charge-rate
-	    nil nil life-energy :idle)
-      :doto doto)))
+    (Tank. angle pos frames
+	   rotate-rate move-rate
+	   move-energy fire-energy
+	   move-energy fire-energy
+	   fire-charge charge-rate
+	   nil nil life-energy doto :idle)))
+
 
 (defn subtract-energy [tank energy-type factor]
   (assoc tank energy-type 
