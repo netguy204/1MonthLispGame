@@ -11,13 +11,14 @@
 	MonthGame.weapons
 	MonthGame.sound
 	MonthGame.state-machine
-	MonthGame.util)
+	MonthGame.util
+	MonthGame.surface)
   (:gen-class))
 
-(import '(javax.swing JFrame JPanel JButton
+(import '(javax.swing JFrame JButton JPanel
 		      JComboBox ComboBoxModel JLabel
 		      ListCellRenderer ImageIcon
-		      SwingConstants)
+		      SwingConstants UIManager)
 	'(java.awt Color Graphics Dimension 
 		   BorderLayout GridBagLayout GridBagConstraints)
 	'(java.awt.image BufferedImage)
@@ -29,7 +30,6 @@
 
 (def *my-world* (ref (World. [] nil [])))
 (def *animator* (agent nil))
-(def *last-render* (ref (System/currentTimeMillis)))
 (def *animation-sleep-ms* 50)
 (def *weapon-selector* (new JComboBox))
 (def *weapon-list-listeners* (ref []))
@@ -112,13 +112,6 @@
 	     (doto lbl
 	       (.setBackground (.getBackground l))
 	       (.setForeground (.getForeground l)))))))))
-
-(defn update-render-time []
-  "returns the time since this function was called last"
-  (dosync
-   (let [old @*last-render*
-	 new (ref-set *last-render* (System/currentTimeMillis))]
-     (- new old))))
 
 (defn make-next-tank-current [world]
   (let [ntanks (count (:tanks world))
@@ -312,9 +305,7 @@
   (alter world make-next-tank-current)
   (notify-weapon-listeners))
 
-(def *my-panel*
-     (proxy [JPanel] []
-       (paint [g] (my-draw g this))))
+(def *my-panel* (make-surface my-draw))
 
 (defn update-npe [npe f & args]
   (alter *my-world* assoc :npes
@@ -433,16 +424,14 @@
 			 (actionPerformed
 			  [ev]
 			  (dosync (change-player! *my-world*))))
-	main-window (JFrame. "Month Game")]
+	main-window (make-window "Month Game" :close-on-exit)]
 
     (init-world)
     (.addActionListener end-turn-button button-clicked)
+    (UIManager/setLookAndFeel (UIManager/getSystemLookAndFeelClassName))
 
-    (doto panel
-      (.addMouseListener mouse-adapter)
-      (.addMouseMotionListener mouse-adapter)
-      (.addMouseWheelListener mouse-adapter))
-    
+    (attach-mouse-adapter panel (make-mouse-adapter *mouse*))
+
     ;; set up the weapon selector
     (.setModel *weapon-selector* *weapon-list-model*)
     (.setRenderer *weapon-selector* *weapon-list-renderer*)
@@ -455,7 +444,6 @@
 	      (.add *weapon-selector* (. BorderLayout LINE_START))
 	      (.add end-turn-button (. BorderLayout CENTER)))
 	    (. BorderLayout SOUTH))
-      (.setDefaultCloseOperation (. JFrame EXIT_ON_CLOSE))
       (.setVisible true))
 
     ;; start the background music

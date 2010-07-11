@@ -11,30 +11,30 @@
    (= button (. MouseEvent BUTTON1)) :button1down
    (= button (. MouseEvent BUTTON3)) :button2down))
   
-(defn update-click [mouse ev down]
+(defn- update-click [mouse ev down]
   (let [button (.getButton ev)
 	buttonsym (button-to-sym button)]
     (if buttonsym (alter mouse assoc buttonsym down))))
   
-(defn update-mouse [ev type]
+(defn- update-mouse [mouse ev type]
   (dosync
-   (alter *mouse* assoc :lastevent ev)
+   (alter mouse assoc :lastevent ev)
    (cond
-    (= type :exit) (alter *mouse* assoc :pos nil)
-    (= type :enter) (alter *mouse* assoc
+    (= type :exit) (alter mouse assoc :pos nil)
+    (= type :enter) (alter mouse assoc
 			   :pos (point-to-vec (.getPoint ev)))
-    (= type :motion) (alter *mouse* assoc
+    (= type :motion) (alter mouse assoc
 			    :pos (point-to-vec (.getPoint ev)))
-    (= type :pressed) (update-click *mouse* ev true)
-    (= type :released) (update-click *mouse* ev false))))
+    (= type :pressed) (update-click mouse ev true)
+    (= type :released) (update-click mouse ev false))))
    
-(def mouse-adapter
+(defn make-mouse-adapter [mouse]
      (proxy [MouseAdapter] []
        (mouseClicked [e] (println "clicked"))
-       (mouseDragged [e] (update-mouse e :motion))
-       (mouseEntered [e] (update-mouse e :enter))
-       (mouseExited [e] (update-mouse e :exit))
-       (mouseMoved [e] (update-mouse e :motion))
-       (mousePressed [e] (update-mouse e :pressed))
-       (mouseReleased [e] (update-mouse e :released))
+       (mouseDragged [e] (update-mouse mouse e :motion))
+       (mouseEntered [e] (update-mouse mouse e :enter))
+       (mouseExited [e] (update-mouse mouse e :exit))
+       (mouseMoved [e] (update-mouse mouse e :motion))
+       (mousePressed [e] (update-mouse mouse e :pressed))
+       (mouseReleased [e] (update-mouse mouse e :released))
        (mouseWheelMoved [mwe] (println "wheeled"))))

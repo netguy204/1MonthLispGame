@@ -103,6 +103,10 @@
   (assoc tank :life-energy
 	 (max 0 (- (:life-energy tank) 0.2))))
 
+(defmethod damage [Tank MonthGame.missiles.Projectile]
+  [tank rocket]
+  (assoc tank :life-energy
+	 (max 0 (- (:life-energy tank) 0.1))))
 
 (defn reset-tank-energy [tank]
   (assoc tank

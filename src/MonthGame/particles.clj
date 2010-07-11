@@ -4,26 +4,22 @@
 	MonthGame.util
 	MonthGame.draw
 	MonthGame.scalar-math
-	MonthGame.sprite))
+	MonthGame.sprite
+	MonthGame.surface
+	MonthGame.mouse))
 
 (import '(java.awt Color Graphics Dimension
 		   AlphaComposite))
 
-(def *drag-factor* 0.9)
-
-(def *max-age* 2)
+(def *drag-factor* 0.3)
 
 (defn simple-drag [p world dt-secs]
-  (if (> (:age p) *max-age*) nil
+  (if (> (:age p) (:max-age p)) nil
       (let [old-pos (position p)
 	    old-vel (:vel p)
 	    pos (vadd old-pos (vmul old-vel dt-secs))
 	    vel (vsub old-vel (vmul old-vel (* *drag-factor* dt-secs)))]
 	(assoc p :pos pos :vel vel))))
-
-(def *smoke-particles*
-     (map #(scale-img (load-img (get-resource "MonthGame/smoke.png")) % %)
-	  (range 32 128)))
 
 (defmacro with-new-graphics [graphics & forms]
   `(let [~graphics (.create ~graphics)
@@ -31,21 +27,22 @@
      (.dispose ~graphics)
      result#))
 
-(defn simple-draw [p g]
-  (let [age-factor (max 0.0 (min 1.0 (/ (:age p) *max-age*)))
+(defn make-simple-draw [imgs]
+  (fn [p g]
+    (let [age-factor (max 0.0 (min 1.0 (/ (:age p) (:max-age p))))
 	alpha (- 1 age-factor)
-	num-frames (count *smoke-particles*)
+	num-frames (count imgs)
 	frameno (int (min (dec num-frames) (max 0 (* num-frames age-factor))))
-	frame (nth *smoke-particles* frameno)
+	frame (nth imgs frameno)
 	pos (vint (vsub (position p) (middle-img frame)))
 	comp (AlphaComposite/getInstance AlphaComposite/SRC_OVER alpha)]
     (with-new-graphics g
       (doto g
 	(.setComposite comp)
-	(draw-img frame pos)))))
+	(draw-img frame pos))))))
 
 (defrecord Particle
-  [pos vel update-fn draw-fn]
+  [pos vel update-fn draw-fn max-age]
 
   NPE
   (update [p world dt-secs]
@@ -67,15 +64,113 @@
 
 (derive Particle :MonthGame.entity/non-interacting-npe)
 
-(def *perp-vel-scale* 25.0)
+(def *perp-vel-scale* 35.0)
 (def *forward-vel* 5.0)
 (def *offset-backward* 40)
 
-(defn emit-basic-particle [pos vel]
+(defn make-basic-emitter [imgs par-speed perp-speed offset-back
+			  update-fn max-age-fn]
   "emit a particle in vel direction with a random perpendicular velocity"
-  (let [dir (unit-vector vel)
-	vp (vmul (vperp vel) (rand-around-zero *perp-vel-scale*))
-	vel (vadd (vmul dir *forward-vel*) vp)
-	pos (vsub pos (vmul dir *offset-backward*))]
+  (let [draw (make-simple-draw imgs)]
+    (fn [pos vel]
+      (let [dir (unit-vector vel)
+	    vp (vmul (vperp vel) (rand-around-zero perp-speed))
+	    vel (vadd (vmul dir par-speed) vp)
+	    pos (vsub pos (vmul dir offset-back))]
 
-    (Particle. pos vel simple-drag simple-draw)))
+	(Particle. pos vel update-fn draw (max-age-fn))))))
+
+(defn- load-with-scales [fname scales]
+  (map #(scale-img (load-img (get-resource fname)) % %) scales))
+
+(def *max-age* 2)
+(defn- constant-max-age []
+  *max-age*)
+
+(defn- make-max-age-spread [min max]
+  (fn [] (+ min (rand (- max min)))))
+
+(def *smoke-particles* (load-with-scales "MonthGame/smoke.png" (range 32 128)))
+(def emit-basic-particle (make-basic-emitter *smoke-particles*
+					     *forward-vel*
+					     *perp-vel-scale*
+					     *offset-backward*
+					     simple-drag
+					     constant-max-age))
+
+(def *fire-particles* (load-with-scales "MonthGame/fire.png" (range 16 128 4)))
+
+
+;; at the moment this looks pretty dumb
+(def *smoke-prob* 0.1)
+
+(defn- simple-drag-with-smoke [p world dt-secs]
+  (let [fire (simple-drag p world dt-secs)]
+    (if (and (> (/ (:age p) (:max-age p)) 0.9)
+	     (> *smoke-prob* (rand)))
+      (do
+	(filter #(not (nil? %)) [fire (emit-basic-particle (:pos p) 
+							   (vmul (:vel p) 5))]))
+      fire)))
+
+(def emit-fire-particle (make-basic-emitter *fire-particles*
+					    50
+					    10
+					    0
+					    simple-drag
+					    (make-max-age-spread 2 5)))
+(def *curr-test-emitter* emit-fire-particle)
+
+(def *test-animator* (agent nil))
+
+(def *particles* (ref []))
+
+(defn- test-draw [g this]
+  (let [width (.getWidth this)
+	height (.getHeight this)
+	tl '(0 0)
+	br (list width height)]
+    (doto g
+      (.setColor (. Color white))
+      (fill-rect tl br))
+    (dosync
+     (doseq [p @*particles*]
+       (draw p g)))))
+
+(defn- test-surface []
+  (defonce *test-surface* (make-surface test-draw))
+  *test-surface*)
+
+(defn- update-test-particles [particles dt-secs]
+  (flatten (filter #(not (nil? %)) (map #(update % nil dt-secs) particles))))
+
+(def *test-mouse* (ref (struct mouse-struct nil false false)))
+
+(defn- test-animation [x]
+   (let [dt (update-render-time)
+	 dt-secs (/ (float dt) 1000)]
+     (dosync
+      (alter *particles* update-test-particles dt-secs)
+      (if (:pos @*test-mouse*)
+	(alter *particles* #(flatten (conj % (*curr-test-emitter*
+					      (:pos @*test-mouse*) '(0 -1))))))
+      (.repaint (test-surface)))
+
+     (Thread/sleep (max 0 (- 50 dt))))
+
+   (send-off *test-animator* #'test-animation)
+   nil)
+
+(defn- restart-test-animation []
+  (restart-agent *test-animator* nil)
+  (send-off *test-animator* test-animation))
+
+(defn particle-test-window []
+  (let [frame (make-window "Particle Test")
+	panel (test-surface)]
+    (doto frame
+      (.setSize 800 600)
+      (.add panel)
+      (.setVisible true))
+    (attach-mouse-adapter panel (make-mouse-adapter *test-mouse*))
+    (send-off *test-animator* test-animation)))
