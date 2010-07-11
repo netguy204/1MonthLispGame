@@ -18,8 +18,13 @@
   (not (nil? obj)))
 
 (defn update-npes [world dt-secs]
-  (let [updates (flatten (map #(update % world dt-secs) (:npes world)))]
-    (assoc world :npes (filter not-nil? updates))))
+  (let [updates (filter not-nil? 
+			(flatten 
+			 (map #(update % world dt-secs) 
+			      (concat (:npes world) (:ni-npes world)))))
+	npes (filter #(not (isa? (class %) ::non-interacting-npe)) updates)
+	ni-npes (filter #(isa? (class %) ::non-interacting-npe) updates)]
+    (assoc world :npes npes :ni-npes ni-npes)))
 
 (defmulti intersect two-dispatch)
 
@@ -51,6 +56,7 @@
 	 (sort-by ypos-for-entity
 		  (concat (map deref (:tanks ~world))
 			  (:npes ~world)
+			  (:ni-npes ~world)
 			  (:barriers ~world)))]
     (doseq [~var entities#]
 	      ~@forms)))

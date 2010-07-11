@@ -1,18 +1,7 @@
-(ns MonthGame.scalar-math
-  (:use MonthGame.vector))
+(ns MonthGame.scalar-math)
 
 (defn within [v range]
   (< (Math/abs v) range))
-
-(defn dir-to-rotate [vfrom vto]
-  (let [afrom (vang vfrom)
-	ato (vang vto)
-	delta (- ato afrom)
-	pi (Math/PI)]
-    (cond
-     (> delta 0) (if (< delta pi) 1 -1)
-     (< delta 0) (if (< delta (neg pi)) 1 -1)
-     true 0)))
 
 (defn add-on-circle [angle incr]
      (let [new-angle (+ angle incr)
@@ -32,3 +21,7 @@
 
 (defn high-byte [sh]
   (MonthGame.BitShift/highByte sh))
+
+(defn rand-around-zero [max]
+  (- (rand (* 2 max)) max))
+

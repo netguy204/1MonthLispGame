@@ -37,3 +37,7 @@
 (defn methods-to-strings [obj]
   (map #(.getName %) (.. obj (getClass) (getMethods))))
 
+(defmacro with-age [[var dt] & forms]
+  `(let [age# (+ (or (:age ~var) 0) ~dt)
+	 ~var (assoc ~var :age age#)]
+     ~@forms))

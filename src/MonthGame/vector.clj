@@ -1,4 +1,5 @@
-(ns MonthGame.vector)
+(ns MonthGame.vector
+  (:use MonthGame.scalar-math))
 
 ;; we're simulating orthographic with a skewed vector space
 ;; here our metric is
@@ -47,7 +48,7 @@
      (let [[x y] v] (Math/atan2 (* y 2) x)))
   ([v1 v2] 
      (Math/acos (/ (vdot v1 v2) (* (vmag v1) (vmag v2))))))
-  
+
 (defn unit-vector [v]
   (let [m (vmag v)]
     (vmul v (/ 1.0 m))))
@@ -74,3 +75,18 @@
 (defn vec? [v]
   (let [[x y] v]
     (and (number? x) (number? y))))
+
+(defn dir-to-rotate [vfrom vto]
+  (let [afrom (vang vfrom)
+	ato (vang vto)
+	delta (- ato afrom)
+	pi (Math/PI)]
+    (cond
+     (> delta 0) (if (< delta pi) 1 -1)
+     (< delta 0) (if (< delta (neg pi)) 1 -1)
+     true 0)))
+
+(defn vperp [v]
+  (let [a (vang v)
+	a2 (add-on-circle a (/ Math/PI 2))]
+    (unitdir a2)))

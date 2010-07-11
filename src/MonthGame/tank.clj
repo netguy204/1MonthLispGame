@@ -4,7 +4,8 @@
 	MonthGame.sprite
 	MonthGame.draw
 	MonthGame.entity
-	MonthGame.weapons))
+	MonthGame.weapons
+	MonthGame.missiles))
 
 (import '(java.awt Color))
 
@@ -178,3 +179,12 @@
 	    (subtract-move-energy (* dtscale 0.1))))
       tank)))
 
+(defn age [ent]
+  (or (:age ent) 0))
+
+(defmethod MonthGame.entity/intersect
+  [:MonthGame.missiles/has-age MonthGame.tank.Tank] [e1 e2]
+  (if (< (age e1) 1)
+    false
+    (circle-intersect e1 e2)))
+      

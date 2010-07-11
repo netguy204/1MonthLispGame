@@ -5,7 +5,9 @@
 	MonthGame.entity
 	MonthGame.explosions
 	MonthGame.weapons
-	MonthGame.sound))
+	MonthGame.sound
+	MonthGame.scalar-math
+	MonthGame.particles))
 
 (def *rocket-frames*
      (let [img-stream (get-resource "MonthGame/rocketsprite.png")]
@@ -30,11 +32,13 @@
 		to-end (vsub end start)
 		dist-to-end (vmag to-end)
 		dir (unit-vector to-end)
-		scale (* (rocket-spd-eqn age max-speed) dt-secs)
-		newpos (vadd (position npe) (vmul dir scale))]
+		spd (rocket-spd-eqn age max-speed)
+		vel (vmul dir spd)
+		newpos (vadd (position npe) (vmul vel dt-secs))]
 	    (if (is-past? end (position npe) dir)
 	      (make-explosion end dir)
-	      (assoc npe :pos newpos :age age))))
+	      (list (emit-basic-particle newpos vel)
+		    (assoc npe :pos newpos :age age)))))
   
   Entity
   (draw [npe g]
@@ -96,9 +100,6 @@
 (def *multirocket-icon* (load-icon-file "MonthGame/multirocketicon.png"))
 
 (def *speed-spread* 100)
-
-(defn rand-around-zero [max]
-  (- (rand-int max) (* max 2)))
 
 (defrecord MultiRocketLauncher
   [rockets salvo-size]
@@ -178,15 +179,6 @@
 
 (derive Projectile ::has-age)
 
-(defn age [ent]
-  (or (:age ent) 0))
-
-(defmethod MonthGame.entity/intersect
-  [::has-age MonthGame.tank.Tank] [e1 e2]
-  (if (< (age e1) 1)
-    false
-    (circle-intersect e1 e2)))
-      
 (def *default-projectile-theta* (/ Math/PI 4))
 (def *projectile-icon* 
      (let [img (make-img 32 32)

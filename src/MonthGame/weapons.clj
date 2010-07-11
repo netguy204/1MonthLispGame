@@ -14,5 +14,4 @@
   two-dispatch)
 
 (defmethod damage :default [target weapon]
-  (println "no damage to " target " due to " weapon)
   target)
