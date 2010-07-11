@@ -1,0 +1,66 @@
+
+
+* TODO Collision Callbacks
+
+Add (collided) to Entity spec. Call on collision. Provide other entity.
+
+* TODO Weapon drops
+
+Airplane flies down the line of the tanks and drops weapons, health boost, range boost, etc.
+
+** Draw airplane
+
+** Add random event launcher
+
+* TODO New Weapons
+** Traking weapons
+
+Tank seeking missile that can be thrown off by missile repelant.
+
+** Tank modifiers
+
+Missile repelant. Make the tank seeker find a new target or fly off randomly.
+
+Aiming aids: laser pointer, etc.
+
+** Projectile weapons
+Can implement cannon balls as projectile that become non-colliding when their z component is > 0. Draw z component as non-skewed y translation. Coordinate frame has z straight up, x straight right, and y coming directly out of the page.
+
+
+** Splitting weapons
+
+Missile that breaks apart into more missiles or into projectiles
+
+* NPE Polish
+
+Add NPE's like cows or birds to randomly amble through the environment. Make some interesting NPE's collidable. Birds vs missiles would be particularly enjoyable.
+
+* Sound
+** TODO Multiple mixed sounds
+** Tank engine noises
+** DONE Missile noises
+Done but same as cannon
+** DONE Explosions
+Done but need variety
+
+* Interactive background
+** Lay down walls by drawing
+** check collision against drawn objects
+*** Stop tanks on collide
+*** Destroy missiles on collide
+*** Don't interfere with elevated objects
+
+* Particle effects
+** Missile exhaust
+** Damage
+** Clouds and birds
+
+* End of Game
+** Destroy tank animation
+Spinning and scaling
+
+* Game world
+** Zoomable (mouse wheel?)
+** Markable
+** More fortification types
+** Land features
