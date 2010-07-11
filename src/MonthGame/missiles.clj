@@ -55,6 +55,8 @@
 		 (let [dir (unit-vector (vsub end start))]
 		   (list (make-explosion (position npe) (vneg dir))))))
 
+(derive Rocket ::has-age)
+
 (defn make-rocket [start end max-speed]
   (Rocket. start end max-speed))
 
@@ -174,6 +176,17 @@
   (collided-with [npe other]
 		 (make-radial-explosions (position npe) 10)))
 
+(derive Projectile ::has-age)
+
+(defn age [ent]
+  (or (:age ent) 0))
+
+(defmethod MonthGame.entity/intersect
+  [::has-age MonthGame.tank.Tank] [e1 e2]
+  (if (< (age e1) 1)
+    false
+    (circle-intersect e1 e2)))
+      
 (def *default-projectile-theta* (/ Math/PI 4))
 (def *projectile-icon* 
      (let [img (make-img 32 32)

@@ -76,6 +76,10 @@
    weapons current-weapon
    life-energy doto state]
   
+  Object
+  (toString [tank]
+	    (format "Tank with %d weapons and %f life-energ"
+		    (count weapons) life-energy))
   Entity
   (draw-meta [tank g]
 	     (draw-tank-meta tank g))
@@ -92,6 +96,12 @@
 		    (/ (.getWidth (first sprites)) 2)))
 
   (collided-with [tank other] tank))
+
+(defmethod damage [Tank MonthGame.missiles.Rocket]
+  [tank rocket]
+  (assoc tank :life-energy
+	 (max 0 (- (:life-energy tank) 0.2))))
+
 
 (defn reset-tank-energy [tank]
   (assoc tank

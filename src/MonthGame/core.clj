@@ -265,12 +265,16 @@
 (defn fire-from-tank! [tank world]
   (let [target (tank-target-pos @tank)
 	pos (:pos @tank)
+	dist (vdist target pos)
 	weapon (default-weapon @tank)
 	npes (fire weapon pos target)]
-    (add-npe-to-world npes world)
-    (alter tank subtract-fire-energy (energy-used weapon pos target))
-    (alter tank assoc :state :idle)
-    (notify-weapon-listeners)))
+    ;; require some range for fire to prevent divide by 0
+    (if (> dist 3)
+      (do
+	(add-npe-to-world npes world)
+	(alter tank subtract-fire-energy (energy-used weapon pos target))
+	(alter tank assoc :state :idle)
+	(notify-weapon-listeners)))))
 
 (def tank-motion
      {:init
@@ -312,6 +316,12 @@
      (proxy [JPanel] []
        (paint [g] (my-draw g this))))
 
+(defn update-npe [npe f & args]
+  (alter *my-world* assoc :npes
+	 (update-item #(= npe %)
+		      [old-npe (:npes @*my-world*)]
+		      (apply f args))))
+
 (declare animation)
 
 (defn- game-animation [x dt-secs]
@@ -322,20 +332,16 @@
     ;; TODO check collisions between npes and walls
     (with-each-collision [npe (:npes @*my-world*)
 			  barrier (:barriers @*my-world*)]
-      (alter *my-world* assoc :npes
-	     (update-item #(= npe %)
-			  [old-npe (:npes @*my-world*)]
-			  (collided-with old-npe barrier))))
-
+      (update-npe npe collided-with npe barrier))
     ;; TODO check collisions between tanks and walls
 
     ;; check collisions between npes and tanks
-    (with-each-collision [tank (map deref (:tanks @*my-world*))
-			  npe (:npes @*my-world*)]
+    (with-each-collision [npe (:npes @*my-world*)
+			  tank (map deref (:tanks @*my-world*))]
+      (update-npe npe collided-with npe tank)
       (with-ref-for tank
 	[tank-ref (:tanks @*my-world*)]
-	(alter tank-ref assoc
-	       :life-energy (- (:life-energy @tank-ref) (* 0.5 dt-secs)))))
+	(alter tank-ref damage npe)))
     
     ;; animate the current player
     (update-tank! tank *my-world* dt-secs))

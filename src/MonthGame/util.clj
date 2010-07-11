@@ -29,11 +29,11 @@
      `(if-let [~var1 ~test1]
 	(if-let* [~var2 ~test2] ~@more))))
 
-(defn- print-agent-error [agent]
+(defn print-agent-error [agent]
   "debugging"
   (let [err (agent-error agent)]
     (print-cause-trace err)))
 
-(defn- methods-to-strings [obj]
+(defn methods-to-strings [obj]
   (map #(.getName %) (.. obj (getClass) (getMethods))))
 
