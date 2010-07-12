@@ -13,13 +13,14 @@
 	MonthGame.state-machine
 	MonthGame.util
 	MonthGame.surface
-	MonthGame.animator)
+	MonthGame.animator
+	MonthGame.world)
   (:gen-class))
 
 (import '(javax.swing JFrame JButton JPanel
 		      JComboBox ComboBoxModel JLabel
 		      ListCellRenderer ImageIcon
-		      SwingConstants UIManager)
+		      SwingConstants UIManager JMenuBar)
 	'(java.awt Color Graphics Dimension 
 		   BorderLayout GridBagLayout GridBagConstraints)
 	'(java.awt.image BufferedImage)
@@ -416,6 +417,10 @@
 	    :current-tank 0
 	    :npes []))))
 
+(def *game-menu*
+     [["Tests" [["Particle test..." #(MonthGame.particles/particle-test-window)]
+		["World designer..." #(MonthGame.world/world-designer)]]]])
+
 (defn -main [& args]
   (let [panel *my-panel*
 	end-turn-button (new JButton "End Turn")
@@ -437,6 +442,7 @@
 
     (doto main-window
       (.setSize 800 600)
+      (.setJMenuBar (build-menu *game-menu* (JMenuBar.)))
       (.add panel (. BorderLayout CENTER))
       (.add (doto (new JPanel)
 	      (.setLayout (new BorderLayout))

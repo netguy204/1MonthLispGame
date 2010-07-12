@@ -1,7 +1,8 @@
-(ns MonthGame.surface)
-
-(import '(javax.swing JPanel JFrame JFileChooser)
-	'(javax.swing.filechooser FileFilter FileView))
+(ns MonthGame.surface
+  (:import (javax.swing JPanel JFrame JFileChooser
+			JMenu JMenuItem)
+	   (javax.swing.filechooser FileFilter FileView)
+	   (java.awt.event ActionListener)))
 
 (defn make-surface [draw-fn]
   (proxy [JPanel] []
@@ -23,11 +24,9 @@
 
 (defn- generate-menu-item
   ([name]
-     (println "menu" name)
      (JMenu. name))
 
   ([name fn]
-     (println "item" name)
      (let [item (JMenuItem. name)]
        (.addActionListener item
 	(proxy [ActionListener] []

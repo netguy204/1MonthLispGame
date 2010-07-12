@@ -7,8 +7,7 @@
 	MonthGame.state-machine
 	MonthGame.util)
   (:import (java.awt Color)
-	   (javax.swing JMenuItem JMenuBar JMenu)
-	   (java.awt.event ActionListener)))
+	   (javax.swing JMenu)))
 
 
 (defn make-world [w h tw th]
