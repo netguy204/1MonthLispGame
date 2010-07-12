@@ -12,6 +12,11 @@
 (defn vmag [v]
   (Math/sqrt (vdot v v)))
 
+(defmacro with-nonzero-vmag [[mag vec] & forms]
+  `(let [~mag (vmag ~vec)]
+     (if (> ~mag 0)
+       (do ~@forms))))
+
 (defn vint [v]
   (let [[x y] v]
     (vector (int (Math/round (double x)))

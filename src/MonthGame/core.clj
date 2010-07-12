@@ -12,7 +12,8 @@
 	MonthGame.sound
 	MonthGame.state-machine
 	MonthGame.util
-	MonthGame.surface)
+	MonthGame.surface
+	MonthGame.animator)
   (:gen-class))
 
 (import '(javax.swing JFrame JButton JPanel
@@ -29,8 +30,6 @@
   [tanks current-tank npes])
 
 (def *my-world* (ref (World. [] nil [])))
-(def *animator* (agent nil))
-(def *animation-sleep-ms* 50)
 (def *weapon-selector* (new JComboBox))
 (def *weapon-list-listeners* (ref []))
 (def *background-music* "MonthGame/background1.mp3")
@@ -215,6 +214,7 @@
 	step-size (wall-step-mag dir)
 	steps (/ dist step-size)
 	step (vmul dir step-size)]
+
     (map #(make-wall-entity sprite %)
 	 (map #(vadd from (vmul step %)) (range steps)))))
 
@@ -232,9 +232,11 @@
     (if-let* 
      [meta (world-mode-meta @*my-world* nil)]
      [path (:path @meta)]
-     (let [walls (concat (path-to-entities path)
-			 (if-let [pos (:pos @*mouse*)]
-			   (make-wall-entities (first path) pos)))]
+     (let [to-mouse
+	   (if-let [pos (:pos @*mouse*)]
+	     (try (make-wall-entities (first path) pos)
+		  (catch java.lang.ArithmeticException e nil)))
+	   walls (concat (path-to-entities path) to-mouse)]
        (doseq [ent (sort-by ypos-for-entity walls)]
 	 (draw ent g))))))
 
@@ -315,7 +317,7 @@
 
 (declare animation)
 
-(defn- game-animation [x dt-secs]
+(defn- game-animation [dt-secs]
   (let [tank (current-tank)]
     ;; update npes
     (alter *my-world* update-npes dt-secs)
@@ -350,9 +352,12 @@
       [{:cond #(not (:button1down @*mouse*))
 	:action #(alter % assoc :path 
 			(if-let [path (:path (deref %))]
-			  (cons (closest-point-towards (first path)
-						       (:pos @*mouse*))
-				path)
+			  (let [nextpt (closest-point-towards 
+					(first path)
+					(:pos @*mouse*))]
+			    (if (not= nextpt (first path))
+				      (cons nextpt path)
+				      path))
 			  (list (:pos @*mouse*))))
 	:next-state :drawing-wall}
        {:default true :next-state :wait-for-release}]
@@ -361,10 +366,15 @@
       [{:cond #(:button1down @*mouse*)
 	:next-state :wait-for-release}
        {:cond #(:button2down @*mouse*)
-	:next-state nil}
-       {:default true :next-state :drawing-wall}]})
+	:next-state :finish-exit}
+       {:default true :next-state :drawing-wall}]
 
-(defn- init-animation [x dt-secs]
+      :finish-exit
+      [{:cond #(not (:button2down @*mouse*))
+	:next-state nil}
+       {:default true :next-state :finish-exit}]})
+
+(defn- init-animation [dt-secs]
   (let [machine (world-mode-meta @*my-world* (create-machine))
 	next-state (update-state machine draw-walls)]
     (if (nil? next-state)
@@ -374,26 +384,15 @@
 	  (alter *my-world* change-world-mode :running nil)))
       (alter *my-world* change-world-mode :init machine))))
 
-(defn animation [x]
-  (let [dt (update-render-time)
-	dt-secs (/ (float dt) 1000)]
-    (dosync
-     (case (world-mode @*my-world*)
-	   :init (init-animation x dt-secs)
-	   :running (game-animation x dt-secs)))
+(defn animation [dt-secs]
+  (dosync
+   (case (world-mode @*my-world*)
+	 :init (init-animation dt-secs)
+	 :running (game-animation dt-secs)))
 
-    (Thread/sleep (max 0 (- *animation-sleep-ms* dt)))
-    (.repaint *my-panel*)
-    (send-off *agent* #'animation)
-    nil))
+  (.repaint *my-panel*))
 
-(defn- start-animation-agent []
-  (send-off *animator* animation))
-
-(defn- restart-animation-agent []
-  "useful for debugging"
-  (restart-agent *animator* nil)
-  (start-animation-agent))
+(def *animator* (make-animator animation 50))
 
 (defn- init-world []
   (let [img-stream (get-resource "MonthGame/tanksprite.png")
@@ -448,5 +447,4 @@
 
     ;; start the background music
     ;(play-stream (get-resource *background-music*))
-    (update-render-time) ; reset the game clock
-    (start-animation-agent)))
+    (start-animation *animator*)))

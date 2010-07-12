@@ -6,10 +6,12 @@
 	MonthGame.scalar-math
 	MonthGame.sprite
 	MonthGame.surface
-	MonthGame.mouse))
+	MonthGame.mouse
+	MonthGame.animator))
 
 (import '(java.awt Color Graphics Dimension
-		   AlphaComposite))
+		   AlphaComposite)
+	'(java.awt.event WindowAdapter))
 
 (def *drag-factor* 0.3)
 
@@ -90,38 +92,50 @@
 (defn- make-max-age-spread [min max]
   (fn [] (+ min (rand (- max min)))))
 
-(def *smoke-particles* (load-with-scales "MonthGame/smoke.png" (range 32 128)))
-(def emit-basic-particle (make-basic-emitter *smoke-particles*
-					     *forward-vel*
-					     *perp-vel-scale*
-					     *offset-backward*
-					     simple-drag
-					     constant-max-age))
+(def *smoke-particles*
+     (load-with-scales
+       "MonthGame/smoke.png" 
+       (range 32 128)))
 
-(def *fire-particles* (load-with-scales "MonthGame/fire.png" (range 16 128 4)))
+(def emit-basic-particle
+     (make-basic-emitter *smoke-particles*
+			 *forward-vel*
+			 *perp-vel-scale*
+			 *offset-backward*
+			 simple-drag
+			 constant-max-age))
+
+(def *fire-particles*
+     (load-with-scales
+       "MonthGame/fire.png"
+       (range 16 128 4)))
 
 
 ;; at the moment this looks pretty dumb
 (def *smoke-prob* 0.1)
 
 (defn- simple-drag-with-smoke [p world dt-secs]
-  (let [fire (simple-drag p world dt-secs)]
+  (let [fire (simple-drag p world dt-secs)
+	new-vel (vmul (:vel p) 5)]
     (if (and (> (/ (:age p) (:max-age p)) 0.9)
 	     (> *smoke-prob* (rand)))
-      (do
-	(filter #(not (nil? %)) [fire (emit-basic-particle (:pos p) 
-							   (vmul (:vel p) 5))]))
+      (filter #(not (nil? %))
+	      [fire (emit-basic-particle (:pos p) new-vel)])
       fire)))
 
-(def emit-fire-particle (make-basic-emitter *fire-particles*
-					    50
-					    10
-					    0
-					    simple-drag
-					    (make-max-age-spread 2 5)))
-(def *curr-test-emitter* emit-fire-particle)
+(def emit-fire-particle
+     (make-basic-emitter 
+      *fire-particles*
+      50
+      10
+      0
+      simple-drag
+      (make-max-age-spread 2 5)))
 
-(def *test-animator* (agent nil))
+;; a partical system test program that makes the pointer
+;; into an emitter for whatever system is defiend by
+;; *curr-test-emitter*
+(def *curr-test-emitter* emit-fire-particle)
 
 (def *particles* (ref []))
 
@@ -146,31 +160,30 @@
 
 (def *test-mouse* (ref (struct mouse-struct nil false false)))
 
-(defn- test-animation [x]
-   (let [dt (update-render-time)
-	 dt-secs (/ (float dt) 1000)]
-     (dosync
-      (alter *particles* update-test-particles dt-secs)
-      (if (:pos @*test-mouse*)
-	(alter *particles* #(flatten (conj % (*curr-test-emitter*
-					      (:pos @*test-mouse*) '(0 -1))))))
-      (.repaint (test-surface)))
+(defn- test-animation [dt-secs]
+  (dosync
+   (alter *particles* update-test-particles dt-secs)
+   (if (:pos @*test-mouse*)
+     (alter *particles* 
+	    #(flatten (conj % (*curr-test-emitter*
+			       (:pos @*test-mouse*)
+			       '(0 -1))))))
+   (.repaint (test-surface))))
 
-     (Thread/sleep (max 0 (- 50 dt))))
-
-   (send-off *test-animator* #'test-animation)
-   nil)
-
-(defn- restart-test-animation []
-  (restart-agent *test-animator* nil)
-  (send-off *test-animator* test-animation))
+(def *test-animator* (make-animator test-animation 50))
 
 (defn particle-test-window []
   (let [frame (make-window "Particle Test")
-	panel (test-surface)]
+	panel (test-surface)
+	close-handler (proxy [WindowAdapter] []
+			  (windowClosing
+			   [e] (stop-animation *test-animator*)))]
+			   
+    (def *test-running* true)
     (doto frame
+      (.addWindowListener close-handler)
       (.setSize 800 600)
       (.add panel)
       (.setVisible true))
     (attach-mouse-adapter panel (make-mouse-adapter *test-mouse*))
-    (send-off *test-animator* test-animation)))
+    (start-animation *test-animator*)))
