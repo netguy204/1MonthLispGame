@@ -42,12 +42,4 @@
 	 ~var (assoc ~var :age age#)]
      ~@forms))
 
-(def *last-render* (ref (System/currentTimeMillis)))
-
-(defn update-render-time []
-  "returns the time since this function was called last"
-  (dosync
-   (let [old @*last-render*
-	 new (ref-set *last-render* (System/currentTimeMillis))]
-     (- new old))))
 

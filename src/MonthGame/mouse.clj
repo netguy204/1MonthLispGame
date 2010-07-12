@@ -4,7 +4,10 @@
 (import '(java.awt.event MouseAdapter MouseEvent))
 
 (defstruct mouse-struct :pos :button1down :button2down :lastevent)
-(def *mouse* (ref (struct mouse-struct nil false false)))
+(defn make-mouse []
+  (ref (struct mouse-struct nil false false)))
+
+(def *mouse* (make-mouse))
 
 (defn button-to-sym [button]
   (cond

@@ -10,8 +10,7 @@
 	MonthGame.animator))
 
 (import '(java.awt Color Graphics Dimension
-		   AlphaComposite)
-	'(java.awt.event WindowAdapter))
+		   AlphaComposite))
 
 (def *drag-factor* 0.3)
 
@@ -158,7 +157,7 @@
 (defn- update-test-particles [particles dt-secs]
   (flatten (filter #(not (nil? %)) (map #(update % nil dt-secs) particles))))
 
-(def *test-mouse* (ref (struct mouse-struct nil false false)))
+(def *test-mouse* (make-mouse))
 
 (defn- test-animation [dt-secs]
   (dosync
@@ -175,11 +174,8 @@
 (defn particle-test-window []
   (let [frame (make-window "Particle Test")
 	panel (test-surface)
-	close-handler (proxy [WindowAdapter] []
-			  (windowClosing
-			   [e] (stop-animation *test-animator*)))]
+	close-handler (stop-animation-listener *test-animator*)]
 			   
-    (def *test-running* true)
     (doto frame
       (.addWindowListener close-handler)
       (.setSize 800 600)

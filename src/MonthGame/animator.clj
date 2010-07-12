@@ -1,5 +1,7 @@
 (ns MonthGame.animator)
 
+(import '(java.awt.event WindowAdapter))
+
 (defn make-animator [anim-fn max-sleep]
   {:agent (agent true)
    :anim-fn anim-fn
@@ -40,3 +42,8 @@
 
 (defn stop-animation [animator]
   (send (:agent animator) disable-animator))
+
+(defn stop-animation-listener [animator]
+  (proxy [WindowAdapter] []
+    (windowClosing
+     [e] (stop-animation animator))))
