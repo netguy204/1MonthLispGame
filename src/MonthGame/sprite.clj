@@ -55,16 +55,22 @@
   (let [width (.getWidth src)]
     (/ width count)))
 
+(defn read-sprites [img tgtsz]
+  (let [height (.getHeight img)
+	width (.getWidth img)
+	frames (/ width height)
+	sprite-width height]
+    (map
+     (fn [idx]
+       (extract-sprite img sprite-width tgtsz idx))
+     (range frames))))
+
+(def read-sprites-mem
+     (memoize (fn [img tgtsz] (read-sprites img tgtsz))))
+
 (defn load-sprites [stream tgtsz]
-     (let [img (load-img stream)
-	   height (.getHeight img)
-	   width (.getWidth img)
-	   frames (/ width height)
-	   sprite-width height]
-       (map
-	(fn [idx]
-	  (extract-sprite img sprite-width tgtsz idx))
-	(range frames))))
+  (let [img (load-img stream)]
+    (read-sprites img tgtsz)))
 
 (defn rad-per-frame [total]
   (/ (* Math/PI 2) total))

@@ -1,4 +1,5 @@
 (ns MonthGame.surface
+  (:use (MonthGame util))
   (:import (javax.swing JPanel JFrame JFileChooser
 			JMenu JMenuItem)
 	   (javax.swing.filechooser FileFilter FileView)
@@ -51,7 +52,7 @@
   (if-let [[base ext] (split-ext name)]
     ext))
 
-(defn- ext-matches [file extensions]
+(defn ext-matches [file extensions]
   (if-let [ext (file-ext (str file))]
     (some {ext true} extensions)))
   
@@ -107,3 +108,26 @@
 
 (defn save-selector [parent & filters]
   (apply selector-base #(.showSaveDialog % parent) filters))
+
+(defn- record-for-file [file recs]
+  (first (filter #(ext-matches file (:type %)) recs)))
+
+(defn open-selector-then-invoke [frecs]
+  (let [ftypes (map #(:type %) frecs)
+	fname (apply open-selector (world-surface) ftypes)]
+    (if (not (nil? fname))
+      (let [selected-record (record-for-file fname frecs)]
+	((:fn selected-record) fname)))))
+
+(defn make-combo-box [spec]
+  (let [strings (map #(:name %) spec)
+	combo (JComboBox. (seq-to-string-array strings))
+	funcs (zipmap strings (map #(:fn %) spec))
+	listener (proxy [ActionListener] []
+		   (actionPerformed 
+		    [e] (let [str (.getSelectedItem combo)
+			      fn (funcs str)]
+			  (fn))))]
+    (.addActionListener combo listener)
+    combo))
+

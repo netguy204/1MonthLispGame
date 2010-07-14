@@ -34,6 +34,9 @@
   (let [err (agent-error agent)]
     (print-cause-trace err)))
 
+(defn stacktrace [er]
+  (print-cause-trace er))
+
 (defn methods-to-strings [obj]
   (map #(.getName %) (.. obj (getClass) (getMethods))))
 
@@ -41,5 +44,12 @@
   `(let [age# (+ (or (:age ~var) 0) ~dt)
 	 ~var (assoc ~var :age age#)]
      ~@forms))
+
+(defn seq-to-string-array [seq]
+  (let [size (count seq)
+	array (make-array String size)]
+    (doseq [n (range size)]
+      (aset array n (nth seq n)))
+    array))
 
 
