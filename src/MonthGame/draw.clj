@@ -13,15 +13,14 @@
     (.fillRect g x y w h)))
 
 (defn draw-leader [g origin length angle]
-  (let [dir (unitdir angle)
-	end (vadd origin (vmul dir length))]
+  (let [end (vadd origin {:angle angle :mag length})]
     (doto g
       (draw-line origin end))))
 
 (defn draw-circle [g origin dia elems]
-  (let [zp (vadd origin (vmul (unitdir 0) dia))]
+  (let [zp (vadd origin {:angle 0 :mag dia})]
     (dorun 
-     (reduce #(draw-line g %1 (vadd origin (vmul (unitdir %2) dia)))
+     (reduce #(draw-line g %1 (vadd origin {:angle %2 :mag dia}))
 	     zp
 	     (map #(* Math/PI 2 (/ % (float elems))) (concat (range 1 elems) (list 0)))))))
      

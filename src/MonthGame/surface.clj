@@ -1,7 +1,7 @@
 (ns MonthGame.surface
   (:use (MonthGame util))
   (:import (javax.swing JPanel JFrame JFileChooser
-			JMenu JMenuItem)
+			JMenu JMenuItem JComboBox)
 	   (javax.swing.filechooser FileFilter FileView)
 	   (java.awt.event ActionListener)))
 
@@ -112,9 +112,9 @@
 (defn- record-for-file [file recs]
   (first (filter #(ext-matches file (:type %)) recs)))
 
-(defn open-selector-then-invoke [frecs]
+(defn open-selector-then-invoke [frecs parent]
   (let [ftypes (map #(:type %) frecs)
-	fname (apply open-selector (world-surface) ftypes)]
+	fname (apply open-selector parent ftypes)]
     (if (not (nil? fname))
       (let [selected-record (record-for-file fname frecs)]
 	((:fn selected-record) fname)))))

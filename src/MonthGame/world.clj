@@ -1,80 +1,13 @@
 (ns MonthGame.world
-  (:use (MonthGame surface draw vector
+  (:use (MonthGame surface draw vector graphics
 		   animator mouse state-machine
-		   util sprite sound))
+		   util sprite sound resources))
   (:import (java.awt Color BorderLayout)
-	   (javax.swing JMenuBar JComboBox)
+	   (javax.swing JMenuBar)
 	   (java.io File FileInputStream)))
 
 
-(defn make-world [w h tw th]
-  {:width w
-   :height h
-   :tiles []})
-
-(defn make-box [ul lr]
-  (list ul lr))
-
-(defn inbox? [box pt]
-  (let [[[x1 y1] [x2 y2]] box
-	[px py] pt]
-    (and
-     (>= px x1) (<= px x2)
-     (>= py y1) (<= py y2))))
-
-(defn tiles-in-box [ul lr] nil)
-
-(defn- load-resource-file [url]
-  (if (= (nth url 0) \:)
-    (get-resource (apply str (drop 1 url)))
-    (FileInputStream. url)))
-
-(defn- resource-dispatch-fn [resource]
-  (:type resource))
-
-(defmulti load-resource resource-dispatch-fn)
-
-(defmethod load-resource :img [resource]
-  (assoc resource :data
-	 (load-img (load-resource-file (:file resource)))))
-
-(defmethod load-resource :sound [resource]
-  (assoc resource :data
-	 (read-frames (load-resource-file (:file resource)))))
-
-(defmulti unload-resource resource-dispatch-fn)
-
-(defmethod unload-resource :default [resource]
-  (dissoc resource :data))
-
-(defn- load-resources [resources]
-  (zipmap (map #(:handle %) resources)
-	  (map load-resource resources)))
-
-(defn- save-resources [rmap]
-  (map unload-resource (vals rmap)))
-
-(defmulti get-sprite-fn (fn [resource, _] (:mode resource)))
-
-(defn- resource-height [resource]
-  (or (:size resource)
-      (.getHeight (:data resource))))
-
-(defmethod get-sprite-fn :directional [resource]
-  (let [height (resource-height resource)
-	frames (read-sprites-mem (:data resource) height)]
-    (fn [g entry]
-      (let [sprite (make-oriented-sprite 
-		    frames
-		    (:orientation entry)
-		    (or (:doto entry) '(0 0)))]
-	(draw-sprite sprite g (:pos entry))))))
-       
-(defn- render-entry [g entry resources]
-  (let [resource ((:handle entry) resources)
-	sprite (get-sprite-fn resource)]
-    (sprite g entry)))
-
+;; temp data while i design this format
 (def *world-resources*
      '({:type :img
 	:file ":MonthGame/jersey_wall.png"
@@ -84,30 +17,42 @@
 	:file ":MonthGame/explosion1.mp3"
 	:handle :explode}))
 
-(def *world-resources2* (load-resources *world-resources*))
-
 (def *world-map*
      [{:handle :jwall
        :pos '(0 0)
-       :orientation (unitdir (/ Math/PI 4))}
+       :orientation (/ Math/PI 4)}
       {:handle :jwall
        :pos '(100 100)
-       :orientation (unitdir (/ Math/PI 2))}])
+       :orientation (/ Math/PI 2)}])
+
+(defn- render-entry [g entry resources]
+  (let [resource ((:handle entry) resources)
+	sprite (get-sprite-fn resource)]
+    (sprite g entry)))
 
 (defn- draw-map [g map resources]
   (doseq [entry map]
     (render-entry g entry resources)))
 
 (def *test-world*
-     {:resources *world-resources*})
+     (ref {:resources (load-resources *world-resources*)
+	   :map *world-map*
+	   :current-resource :jwall
+	   :current-meta {:orientation 0}}))
 
 (defn- world-draw [g this]
-  (let [w (.getWidth this)
-	h (.getHeight this)]
-    (doto g
-      (.setColor (Color/white))
-      (fill-rect '(0 0) (list w h))
-      (draw-map *world-map* *world-resources2*))))
+  (dosync
+   (let [w (.getWidth this)
+	 h (.getHeight this)
+	 resources (:resources @*test-world*)
+	 map (:map @*test-world*)]
+     (doto g
+       (.setColor (Color/white))
+       (fill-rect '(0 0) (list w h))
+       (draw-map map resources))
+     (if (:pos @*mouse*)
+       nil)))) ; dostuff
+       
 
 (def *world-surface*)
 (defn- world-surface []
@@ -119,6 +64,7 @@
 				    :current-tile nil))
 
 (defn place-current-tile [machine]
+  ;; replace world current tile with tile from machine
   (println "current tile is" (:current-tile @machine)))
 
 (def edit-transitions
@@ -202,7 +148,7 @@
 (defn- open-file []
   (let [specs [{:type ["A text file" "txt" "clj"] :fn #'open-text-file}
 	       {:type ["An image" "jpg" "jpeg" "png"] :fn #'open-image-file}]]
-    (open-selector-then-invoke specs)))
+    (open-selector-then-invoke specs (world-surface))))
 
 (defn- save-file []
   (println "save"))

@@ -1,9 +1,15 @@
 (ns MonthGame.util
   (:use clojure.stacktrace))
 
-; double dispatch multi-method
 (defn two-dispatch [t1 t2]
+  "double dispatch on class type"
   [(class t1) (class t2)])
+
+(defn tag-or-class [obj]
+  "dispatch on tag if exists, else class"
+  (if-let [m (meta obj)]
+    (:tag m)
+    (class obj)))
 
 (defmacro update-item [selector [var coll] & forms]
   "replace the item found by selector with the result of executing forms"
@@ -52,4 +58,6 @@
       (aset array n (nth seq n)))
     array))
 
-
+(defn get-resource [file]
+  (let [loader (clojure.lang.RT/baseLoader)]
+    (.getResourceAsStream loader file)))

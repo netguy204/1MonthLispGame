@@ -1,17 +1,12 @@
 (ns MonthGame.missiles
-  (:use MonthGame.vector
-	MonthGame.draw
-	MonthGame.sprite
-	MonthGame.entity
-	MonthGame.explosions
-	MonthGame.weapons
-	MonthGame.sound
-	MonthGame.scalar-math
-	MonthGame.particles))
+  (:use (MonthGame vector draw sprite util
+		   entity explosions weapons
+		   sound scalar-math particles
+		   graphics)))
 
 (def *rocket-frames*
      (let [img-stream (get-resource "MonthGame/rocketsprite.png")]
-       (load-sprites img-stream 64)))
+       (scale-img (load-sprites img-stream) 64 64)))
 
 (defn rocket-spd-eqn [age max-speed]
   (cond
@@ -45,7 +40,8 @@
 	(let [dir (unit-vector (vsub end start))
 	      sprite (make-oriented-sprite *rocket-frames* dir)
 	      pos (or (:pos npe) start)]
-	  (draw-sprite sprite g pos)))
+	  (with-offset-g [g pos]
+	    (draw-sprite g sprite))))
 
   (draw-meta [npe g] nil)
 
@@ -72,7 +68,7 @@
 (def *rocket-icon* (load-icon-file "MonthGame/rocketicon.png"))
 
 (def *projectile-sound*
-     (read-frames (get-resource "MonthGame/cannon2.mp3")))
+     (read-audio-frames (get-resource "MonthGame/cannon2.mp3")))
 
 (defrecord RocketLauncher
   [rockets]
@@ -131,12 +127,12 @@
 (def *projectile-shadow-img*
      (scale-img (load-img (get-resource "MonthGame/sphere_shadow.png")) 16 16))
 
-(def *acceleration-of-gravity* 70.0)
+(def *acceleration-of-gravity* 200.0)
 
 (defn projectile-eqn [start end age theta]
   (let [d (vdist end start)
 	tan (Math/tan theta)
-	dir (unit-vector (vsub end start))
+	dir (unit-vector d)
 	vz0 (Math/sqrt (/ (* d tan *acceleration-of-gravity*) 2))
 	z (- (* vz0 age) (* 0.5 age age *acceleration-of-gravity*))
 	plane-vel (/ vz0 tan)
@@ -162,7 +158,8 @@
 	      sprite (make-elevated-sprite *projectile-img*
 					   *projectile-shadow-img*
 					   z)]
-	  (draw-sprite sprite g pos)))
+	  (with-offset-g [g pos]
+	    (draw-sprite g sprite))))
 	  
 
   (draw-meta [npe g] nil)

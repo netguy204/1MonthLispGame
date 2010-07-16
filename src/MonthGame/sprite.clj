@@ -1,128 +1,81 @@
 (ns MonthGame.sprite
-  (:use MonthGame.vector
-	MonthGame.draw))
+  (:use (MonthGame scalar-math vector 
+		   graphics draw util))
+  (:import (java.awt Color Graphics Dimension)
+	   (java.awt.image BufferedImage)
+	   (java.io File)))
 
-(import '(java.awt Color Graphics Dimension)
-	'(java.awt.image BufferedImage)
-	'(java.io File)
-	'(javax.imageio ImageIO))
+(defmulti draw-sprite
+  "draw a sprite to context g"
+  (fn [g sprite] (tag-or-class sprite)))
 
-(defprotocol Sprite
-  (draw-sprite [sprt g pos] "draw a sprite to the screen"))
-
-(defn get-resource [file]
-  (let [loader (clojure.lang.RT/baseLoader)]
-    (.getResourceAsStream loader file)))
-
-(defn load-img [stream]
-  (ImageIO/read stream))
-
-(defn middle-img [img]
-  (let [width (.getWidth img)
-	height (.getHeight img)]
-    (list (/ width 2) (/ height 2))))
-
-(defn make-img [width height]
-  (new BufferedImage width height (. BufferedImage TYPE_INT_ARGB)))
-
-(defn scale-img [img new-width new-height]
-  (let [width (.getWidth img)
-	height (.getHeight img)
-	new-img (make-img new-width new-height)
-	bg (.getGraphics new-img)]
-    (doto bg
-      (.drawImage img
-		  0 0 new-width new-height
-		  0 0 width height nil)
-      (.dispose))
-    new-img))
-
-(defn extract-sprite [img width new-width n]
+(defn extract-sprite-impl [img n]
   (let [height (.getHeight img)
-	new-height (* (/ new-width width) height)
-	simg (make-img new-width new-height)
+	simg (make-img height height)
 	bg (.getGraphics simg)
-	sx1 (* width n)
-	sx2 (+ sx1 width)]
+	sx1 (* height n)
+	sx2 (+ sx1 height)]
     (doto bg
       (.drawImage img
-		0 0 new-width new-height
+		0 0 height height
 		sx1 0 sx2 height nil)
       (.dispose))
     simg))
 
-(defn frame-width [src count]
-  (let [width (.getWidth src)]
-    (/ width count)))
+(def extract-sprite
+     #^{:doc "extract the nth square frame from a 1d sprite sheet"}
+     (memoize (fn [img n] (extract-sprite-impl img n))))
 
-(defn read-sprites [img tgtsz]
+(defn read-frames [img]
+  "read an entire 1d sprite strip into a list of BufferedImages"
   (let [height (.getHeight img)
 	width (.getWidth img)
-	frames (/ width height)
-	sprite-width height]
-    (map
-     (fn [idx]
-       (extract-sprite img sprite-width tgtsz idx))
-     (range frames))))
+	numframes (/ width height)
+	frames (doall
+		(for [n (range numframes)]
+		  (extract-sprite img n)))]
+    (with-meta frames {:tag ::frames})))
 
-(def read-sprites-mem
-     (memoize (fn [img tgtsz] (read-sprites img tgtsz))))
+(defmethod scale-img ::frames
+  [img width height]
+  #^::frames (doall
+	      (for [frame img]
+		(scale-img frame width height))))
 
-(defn load-sprites [stream tgtsz]
-  (let [img (load-img stream)]
-    (read-sprites img tgtsz)))
+(def load-sprites (comp read-frames load-img))
 
-(defn rad-per-frame [total]
-  (/ (* Math/PI 2) total))
-
-(defn frame-to-angle [n total]
-  (* (rad-per-frame total) n))
-
-(defn angle-to-frame [angle total]
-  (let [frame (int (Math/round (/ angle (rad-per-frame total))))]
-    (cond
-     (>= frame total) (- frame total)
-     (< frame 0) (+ frame total)
-     true frame)))
-
-(defn discretize-angle [angle total]
-  (frame-to-angle (angle-to-frame angle total) total))
-
-(defn unitdir-for-frame [n total]
-  (unitdir (frame-to-angle n total)))
-
-(defrecord OrientedSprite
-  [frames dir doto]
-
-  Sprite
-  (draw-sprite
-   [sprt g pos]
-   (let [angle (vang dir)
-	 frameno (angle-to-frame angle (count frames))
-	 frame (nth frames frameno)
-	 off (vadd (middle-img frame) doto)
-	 tgt (vint (vsub pos off))]
-     (draw-img g frame tgt))))
+(defmethod draw-sprite BufferedImage
+  [g sprite]
+  (draw-img g sprite '(0 0)))
 
 (defn make-oriented-sprite
   ([frames dir]
      (make-oriented-sprite frames dir '(0 0)))
 
   ([frames dir doto]
-  (OrientedSprite. frames dir doto)))
+     #^::oriented-sprite {:frames frames
+			  :angle (vang dir)
+			  :doto (to-vector doto)}))
 
-(defrecord ElevatedSprite
-  [main shadow height]
-
-  Sprite
-  (draw-sprite
-   [sprt g pos]
-   (let [proj-loc (vadd pos (list 0 (neg height)))
-	 off (middle-img main)
-	 shad-loc-off (vsub pos off)
-	 proj-loc-off (vsub proj-loc off)]
-     (draw-img g shadow (vint shad-loc-off))
-     (draw-img g main (vint proj-loc-off)))))
+(defmethod draw-sprite ::oriented-sprite
+  [g sprite]
+  (let [angle (:angle sprite)
+	frames (:frames sprite)
+	frameno (angle-to-frame angle (count frames))
+	frame (nth frames frameno)
+	off (vneg (vadd (middle-img frame) (:doto sprite)))]
+    (with-offset-g [g off]
+      (draw-sprite g frame))))
 
 (defn make-elevated-sprite [main shadow height]
-  (ElevatedSprite. main shadow height))
+  #^::elevated-sprite {:main main
+			:shadow shadow
+			:height height})
+
+(defmethod draw-sprite ::elevated-sprite
+  [g sprite]
+  (let [proj-loc (list 0 (neg (:height sprite)))]
+    (draw-sprite g (:shadow sprite))
+    (with-offset-g [g proj-loc]
+      (draw-sprite g (:main sprite)))))
+

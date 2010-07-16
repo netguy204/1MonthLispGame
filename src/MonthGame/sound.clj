@@ -64,7 +64,7 @@
 
 ; the real api is here...
 
-(defn read-frames [stream]
+(defn read-audio-frames [stream]
   "read in an mp3 file, decode it, and store enough info so that play-preloaded can play it back"
   (let [bitstream (Bitstream. stream)
 	decoder (Decoder.)
@@ -74,7 +74,7 @@
      :bitstream bitstream :decoder decoder}))
 		 
 (defn play-preloaded-now [f-rec]
-  "play something that read-frames loaded back through the default sound system"
+  "play something that read-audio-frames loaded back through the default sound system"
   (let [line (get-line-for-format (get-audio-format f-rec))]
     (write-to-line line (:data f-rec))
     (.drain line)

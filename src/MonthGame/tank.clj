@@ -1,22 +1,15 @@
 (ns MonthGame.tank
-  (:use MonthGame.vector
-	MonthGame.scalar-math
-	MonthGame.sprite
-	MonthGame.draw
-	MonthGame.entity
-	MonthGame.weapons
-	MonthGame.missiles))
-
-(import '(java.awt Color))
+  (:use (MonthGame vector scalar-math sprite
+		   draw entity weapons missiles
+		   graphics))
+  (:import (java.awt Color)))
 
 (defn num-frames [tank]
   (count (:sprites tank)))
 
 (defn tank-target-pos [tank]
-  (let [angle (:angle tank)
-	dir (unitdir angle)
-	target (vadd (position tank) (vmul dir (:charge tank)))]
-  target))
+  (let [angle (:angle tank)]
+    (vadd (position tank) {:angle angle :mag (:charge tank)})))
 
 (defn default-weapon [tank]
   (nth (:weapons tank) (:current-weapon tank)))
@@ -49,10 +42,10 @@
       (.setColor (. Color black))
       (draw-leader (position tank) 60 (:angle tank)))
     
-    (if (= (:state tank) :charging)
+    (if (and (:charge tank) (> (:charge tank) 0))
       (let [scale (max 30 (* 0.25 (:charge tank)))
-	    d1 (vmul (unitdir (/ Math/PI 4)) scale)
-	    d2 (vmul (unitdir (neg (/ Math/PI 4))) scale)
+	    d1 {:angle (/ Math/PI 4) :mag scale}
+	    d2 {:angle (neg (/ Math/PI 4)) :mag scale}
 	    l1a (vsub target d1)
 	    l1b (vadd target d1)
 	    l2a (vsub target d2)
@@ -79,17 +72,17 @@
   
   Object
   (toString [tank]
-	    (format "Tank with %d weapons and %f life-energ"
+	    (format "Tank with %d weapons and %f life-energy"
 		    (count weapons) life-energy))
   Entity
   (draw-meta [tank g]
 	     (draw-tank-meta tank g))
 
   (draw [tank g]
-	(let [dir (unitdir angle)
-	      sprite (make-oriented-sprite sprites dir doto)]
+	(let [sprite (make-oriented-sprite sprites angle doto)]
 		     
-	  (draw-sprite sprite g (position tank))))
+	  (with-offset-g [g (position tank)]
+	    (draw-sprite g sprite))))
 
   (position [tank] (:pos tank))
   
@@ -155,9 +148,8 @@
 
 (defn move-towards-cursor [tank mouse dt-secs]
   (let [to-mouse (vsub (:pos mouse) (position tank))
-	tank-dir (unitdir
-		  (discretize-angle (:angle tank)
-				    (num-frames tank)))
+	tank-dir (discretize-angle (:angle tank)
+				   (num-frames tank))
 	dxscale (* (:move-rate tank) dt-secs)
 	rotate-dir (dir-to-rotate tank-dir to-mouse)
 	dtscale (* (:rotate-rate tank) dt-secs rotate-dir)

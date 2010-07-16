@@ -1,20 +1,9 @@
 (ns MonthGame.core
-  (:use MonthGame.vector
-	MonthGame.sprite
-	MonthGame.draw
-	MonthGame.tank
-	MonthGame.scalar-math
-	MonthGame.mouse
-	MonthGame.missiles
-	MonthGame.explosions
-	MonthGame.entity
-	MonthGame.weapons
-	MonthGame.sound
-	MonthGame.state-machine
-	MonthGame.util
-	MonthGame.surface
-	MonthGame.animator
-	MonthGame.world)
+  (:use (MonthGame vector sprite draw graphics
+		   tank scalar-math mouse
+		   missiles explosions entity
+		   weapons sound state-machine
+		   util surface animator world))
   (:gen-class))
 
 (import '(javax.swing JFrame JButton JPanel
@@ -39,9 +28,6 @@
 
 (defn- current-tank []
   (nth (:tanks @*my-world*) (:current-tank @*my-world*)))
-
-(defn- add-tank [world tank]
-  (assoc world :tanks (cons tank (:tanks world))))
 
 (defn- world-mode [world]
   (or (:mode world) :init))
@@ -166,7 +152,7 @@
 
 (def *wall-frames*
      (let [img-stream (get-resource "MonthGame/jersey_wall.png")]
-       (load-sprites img-stream 160)))
+       (scale-img (load-sprites img-stream) 160 160)))
 
 (defn- wall-step-mag [dir]
   (* (.getWidth (first *wall-frames*)) 0.6))
@@ -180,9 +166,8 @@
   (let [tovec (vsub to from)
 	dir (unit-vector tovec)
 	angle (discretize-angle (vang dir) (count *wall-frames*))
-	projdir (unitdir angle)
 	mag (vmag tovec)]
-    (vmul projdir (discretize-wall-mag dir mag))))
+    {:angle angle :mag (discretize-wall-mag dir mag)}))
 
 (defn- closest-point-towards [from to]
   (vadd from (project-wall-towards from to)))
@@ -190,7 +175,11 @@
 (defn- make-wall-entity [sprite pos]
   (let [wall (reify
 	      Entity
-	      (draw [entity g] (draw-sprite sprite g pos))
+	      (draw
+	       [entity g]
+	       (with-offset-g [g pos]
+		 (draw-sprite g sprite)))
+
 	      (draw-meta [entity g] nil)
 	      (position [entity] pos)
 	      (radius [entity] 0)
@@ -248,15 +237,11 @@
 	 :running (game-running-draw g this))))
 
 (defn charge-for-fire [tank dt-secs]
-   (let [was-charging (= (:state tank) :charging)
-	 tank (assoc tank :state :charging)
-	 max-range (range-for-energy (default-weapon tank)
+   (let [max-range (range-for-energy (default-weapon tank)
 				     (:fire-energy tank))]
-     (if was-charging
-       (assoc tank :charge 
-	      (min max-range (+ (:charge tank)
-				(* dt-secs (:charge-rate tank)))))
-       (assoc tank :charge 0))))
+     (assoc tank :charge 
+	    (min max-range (+ (:charge tank)
+			      (* dt-secs (:charge-rate tank)))))))
 
 (defn fire-from-tank! [tank world]
   (let [target (tank-target-pos @tank)
@@ -277,6 +262,7 @@
       [{:cond #(and (:button2down @*mouse*)
 		    (can-fire? @(current-tank))
 		    (> (shots (default-weapon @(current-tank))) 0))
+	:action (fn [m dt] (alter (current-tank) assoc :charge 0))
 	:next-state :charging}
        {:cond #(and (:button1down @*mouse*)
 		    (can-move? @(current-tank)))
@@ -295,7 +281,9 @@
 	:action (fn [m dt] (alter (current-tank) charge-for-fire dt))
 	:next-state :charging}
        {:cond #(not (:button2down @*mouse*))
-	:action (fn [m dt] (fire-from-tank! (current-tank) *my-world*))
+	:action (fn [m dt]
+		  (fire-from-tank! (current-tank) *my-world*)
+		  (alter (current-tank) assoc :charge 0))
 	:next-state :init}]})
 	
 (defn update-tank! [tank world dt-secs]
@@ -397,7 +385,7 @@
 
 (defn- init-world []
   (let [img-stream (get-resource "MonthGame/tanksprite.png")
-	frames (load-sprites img-stream 128)
+	frames (scale-img (load-sprites img-stream) 128 128)
 	tank1 (ref (make-tank frames '(0 15)
 			      (/ Math/PI 4) '(64 64)))
 	tank2 (ref (make-tank frames '(0 15)

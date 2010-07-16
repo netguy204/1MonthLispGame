@@ -25,3 +25,18 @@
 (defn rand-around-zero [max]
   (- (rand (* 2 max)) max))
 
+(defn rad-per-frame [total]
+  (/ (* Math/PI 2) total))
+
+(defn frame-to-angle [n total]
+  (* (rad-per-frame total) n))
+
+(defn angle-to-frame [angle total]
+  (let [frame (int (Math/round (/ angle (rad-per-frame total))))]
+    (cond
+     (>= frame total) (- frame total)
+     (< frame 0) (+ frame total)
+     true frame)))
+
+(defn discretize-angle [angle total]
+  (frame-to-angle (angle-to-frame angle total) total))

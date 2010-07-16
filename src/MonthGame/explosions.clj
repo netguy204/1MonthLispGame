@@ -1,13 +1,11 @@
 (ns MonthGame.explosions
-  (:use MonthGame.vector
-	MonthGame.draw
-	MonthGame.sprite
-	MonthGame.entity
-	MonthGame.sound))
+  (:use (MonthGame vector draw sprite
+		   entity sound util
+		   graphics)))
 
 (def *explode-frames*
      (let [img-stream (get-resource "MonthGame/explode.png")]
-       (load-sprites img-stream 64)))
+       (scale-img (load-sprites img-stream) 64 64)))
 
 (defrecord Explosion
   [start dir drift-dist duration]
@@ -37,14 +35,14 @@
   (position [npe]
 	    (let [time-elapsed (or (:time-elapsed npe) 0)
 		  drift-speed (/ (float drift-dist) duration)]
-	      (vint (vadd start (vmul dir (* time-elapsed drift-speed))))))
+	      (vint (vadd start {:angle dir :mag (* time-elapsed drift-speed)}))))
 
   (radius [npe] (/ (.getWidth (first *explode-frames*)) 2))
 
   (collided-with [npe other] npe))
 	    
 (def *explosion-sound*
-     (read-frames (get-resource "MonthGame/explosion1.mp3")))
+     (read-audio-frames (get-resource "MonthGame/explosion1.mp3")))
 
 (defn make-explosion [pos dir]
   (println "making explosion")
@@ -53,6 +51,5 @@
 
 (defn make-radial-explosions [pos num]
   (play-async *explosion-sound*)
-  (let [skip-size (/ (* Math/PI 2) num)
-	dirs (map (fn [ii] (unitdir (* ii skip-size))) (range num))]
-    (map (fn [dir] (Explosion. pos dir 60 1)) dirs)))
+  (let [skip-size (/ (* Math/PI 2) num)]
+    (map (fn [idx] (Explosion. pos (* idx skip-size) 60 1)) (range num))))

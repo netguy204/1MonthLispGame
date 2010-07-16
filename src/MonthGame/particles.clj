@@ -1,16 +1,9 @@
 (ns MonthGame.particles
-  (:use MonthGame.entity
-	MonthGame.vector
-	MonthGame.util
-	MonthGame.draw
-	MonthGame.scalar-math
-	MonthGame.sprite
-	MonthGame.surface
-	MonthGame.mouse
-	MonthGame.animator))
-
-(import '(java.awt Color Graphics Dimension
-		   AlphaComposite))
+  (:use (MonthGame entity vector util graphics
+		   draw scalar-math sprite
+		   surface mouse animator))
+  (:import (java.awt Color Graphics Dimension
+		     AlphaComposite)))
 
 (def *drag-factor* 0.3)
 
@@ -21,12 +14,6 @@
 	    pos (vadd old-pos (vmul old-vel dt-secs))
 	    vel (vsub old-vel (vmul old-vel (* *drag-factor* dt-secs)))]
 	(assoc p :pos pos :vel vel))))
-
-(defmacro with-new-graphics [graphics & forms]
-  `(let [~graphics (.create ~graphics)
-	 result# (do ~@forms)]
-     (.dispose ~graphics)
-     result#))
 
 (defn make-simple-draw [imgs]
   (fn [p g]
@@ -82,7 +69,7 @@
 	(Particle. pos vel update-fn draw (max-age-fn))))))
 
 (defn- load-with-scales [fname scales]
-  (map #(scale-img (load-img (get-resource fname)) % %) scales))
+  (doall (map #(scale-img (load-img (get-resource fname)) % %) scales)))
 
 (def *max-age* 2)
 (defn- constant-max-age []

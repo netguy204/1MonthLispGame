@@ -3,9 +3,9 @@
 
 (import '(java.awt.event MouseAdapter MouseEvent))
 
-(defstruct mouse-struct :pos :button1down :button2down :lastevent)
+(defstruct mouse-struct :pos :button1down :button2down :lastevent :scroll-pos)
 (defn make-mouse []
-  (ref (struct mouse-struct nil false false)))
+  (ref (struct mouse-struct nil false false 0)))
 
 (def *mouse* (make-mouse))
 
@@ -22,14 +22,17 @@
 (defn- update-mouse [mouse ev type]
   (dosync
    (alter mouse assoc :lastevent ev)
-   (cond
-    (= type :exit) (alter mouse assoc :pos nil)
-    (= type :enter) (alter mouse assoc
-			   :pos (point-to-vec (.getPoint ev)))
-    (= type :motion) (alter mouse assoc
-			    :pos (point-to-vec (.getPoint ev)))
-    (= type :pressed) (update-click mouse ev true)
-    (= type :released) (update-click mouse ev false))))
+   (case type
+    :exit (alter mouse assoc :pos nil)
+    :enter (alter mouse assoc
+		  :pos (point-to-vec (.getPoint ev)))
+    :motion (alter mouse assoc
+		   :pos (point-to-vec (.getPoint ev)))
+    :pressed (update-click mouse ev true)
+    :released (update-click mouse ev false)
+    :scrolled (alter mouse assoc
+		     :scroll-pos (+ (:scroll-pos @mouse)
+				    (.getWheelRotation ev))))))
    
 (defn make-mouse-adapter [mouse]
      (proxy [MouseAdapter] []
@@ -40,4 +43,4 @@
        (mouseMoved [e] (update-mouse mouse e :motion))
        (mousePressed [e] (update-mouse mouse e :pressed))
        (mouseReleased [e] (update-mouse mouse e :released))
-       (mouseWheelMoved [mwe] (println "wheeled"))))
+       (mouseWheelMoved [mwe] (update-mouse mouse mwe :scrolled))))
