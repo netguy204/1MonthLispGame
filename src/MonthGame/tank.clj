@@ -4,9 +4,6 @@
 		   graphics))
   (:import (java.awt Color)))
 
-(defn num-frames [tank]
-  (count (:sprites tank)))
-
 (defn tank-target-pos [tank]
   (let [angle (:angle tank)]
     (vadd (position tank) {:angle angle :mag (:charge tank)})))
@@ -62,13 +59,13 @@
 ;oto = offset to origin
 ;center of mass - top left corner of sprite
 (defrecord Tank
-  [angle pos sprites
+  [angle pos sprite
    rotate-rate move-rate
    move-energy fire-energy
    max-move-energy max-fire-energy
    charge charge-rate
    weapons current-weapon
-   life-energy doto state]
+   life-energy]
   
   Object
   (toString [tank]
@@ -79,7 +76,7 @@
 	     (draw-tank-meta tank g))
 
   (draw [tank g]
-	(let [sprite (make-oriented-sprite sprites angle doto)]
+	(let [sprite (assoc sprite :angle angle)]
 		     
 	  (with-offset-g [g (position tank)]
 	    (draw-sprite g sprite))))
@@ -87,7 +84,7 @@
   (position [tank] (:pos tank))
   
   (radius [tank] (* *tank-radius-factor*
-		    (/ (.getWidth (first sprites)) 2)))
+		    (/ (first (img-size sprite)) 2)))
 
   (collided-with [tank other] tank))
 
@@ -106,9 +103,6 @@
     :move-energy (:max-move-energy tank)
     :fire-energy (:max-fire-energy tank)))
   
-(defn frame-angle-tolerance [tank]
-  (rad-per-frame (num-frames tank)))
-
 (defn make-tank [frames doto angle pos]
   (let [rotate-rate (* Math/PI 0.25)
 	move-rate 50
@@ -116,14 +110,15 @@
 	fire-energy 200
 	fire-charge 0
 	charge-rate 130
-	life-energy 1.0]
+	life-energy 1.0
+	sprite (make-oriented-sprite frames angle doto)]
 
-    (Tank. angle pos frames
+    (Tank. angle pos sprite
 	   rotate-rate move-rate
 	   move-energy fire-energy
 	   move-energy fire-energy
 	   fire-charge charge-rate
-	   nil nil life-energy doto :idle)))
+	   nil nil life-energy)))
 
 
 (defn subtract-energy [tank energy-type factor]
@@ -148,8 +143,7 @@
 
 (defn move-towards-cursor [tank mouse dt-secs]
   (let [to-mouse (vsub (:pos mouse) (position tank))
-	tank-dir (discretize-angle (:angle tank)
-				   (num-frames tank))
+	tank-dir (discretize-angle (:angle tank) (:sprite tank))
 	dxscale (* (:move-rate tank) dt-secs)
 	rotate-dir (dir-to-rotate tank-dir to-mouse)
 	dtscale (* (:rotate-rate tank) dt-secs rotate-dir)
@@ -157,21 +151,19 @@
 
     ;; only move if we're not where the mouse is
     (if (> (vmag to-mouse) 50)
-      (if (within dtheta (frame-angle-tolerance tank))
+      (if (within dtheta (frame-angle-tolerance (:sprite tank)))
 
 	;; drive forward, we're as accurate in angle as we can be
 	(-> tank
 	    (assoc 
-		:pos (vadd (position tank) (vmul tank-dir dxscale))
-		:state :moving)
+		:pos (vadd (position tank) (vmul tank-dir dxscale)))
 	    (subtract-move-energy dxscale)
 	    (subtract-fire-energy (* 2 dxscale)))
 
 	;; turn to face the cursor
 	(-> tank
 	    (assoc
-		:angle (add-on-circle (:angle tank) dtscale)
-		:state :moving)
+		:angle (add-on-circle (:angle tank) dtscale))
 	    (subtract-move-energy (* dtscale 0.1))))
       tank)))
 

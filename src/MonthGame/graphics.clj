@@ -3,6 +3,17 @@
   (:import (javax.imageio ImageIO)
 	   (java.awt.image BufferedImage)))
 
+(defmulti scale-img
+  "scale an image like thing"
+  (fn [img width height] (tag-or-class img)))
+
+(defmulti img-size
+  "size of an image like thing"
+  tag-or-class)
+
+(defn img-width [img] (first (img-size img)))
+(defn img-height [img] (second (img-size img)))
+
 (defn load-img [stream]
   (ImageIO/read stream))
 
@@ -22,19 +33,15 @@
   (new BufferedImage width height (. BufferedImage TYPE_INT_ARGB)))
 
 (defn middle-img [img]
-  (let [width (.getWidth img)
-	height (.getHeight img)]
+  (let [width (img-width img)
+	height (img-height img)]
     (list (/ width 2) (/ height 2))))
-
-(defmulti scale-img
-  "scale an image like thing"
-  (fn [img width height] (tag-or-class img)))
 
 (defmethod scale-img BufferedImage
   [img new-width new-height]
 
-  (let [width (.getWidth img)
-	height (.getHeight img)
+  (let [width (img-width img)
+	height (img-height img)
 	new-img (make-img new-width new-height)
 	bg (.getGraphics new-img)]
     (doto bg
@@ -44,3 +51,6 @@
       (.dispose))
     new-img))
 
+(defmethod img-size BufferedImage
+  [img]
+  (list (.getWidth img) (.getHeight img)))

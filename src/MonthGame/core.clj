@@ -150,12 +150,13 @@
     (.dispose bg)
     (.drawImage g img 0 0 nil)))
 
-(def *wall-frames*
-     (let [img-stream (get-resource "MonthGame/jersey_wall.png")]
-       (scale-img (load-sprites img-stream) 160 160)))
+(def *wall-sprite*
+     (let [img-stream (get-resource "MonthGame/jersey_wall.png")
+	   frames (scale-img (load-sprites img-stream) 160 160)]
+       (make-oriented-sprite frames 0 '(0 40))))
 
 (defn- wall-step-mag [dir]
-  (* (.getWidth (first *wall-frames*)) 0.6))
+  (* (first (img-size *wall-sprite*)) 0.6))
 
 (defn- discretize-wall-mag [dir mag]
   (let [step-size (wall-step-mag dir)
@@ -165,7 +166,7 @@
 (defn- project-wall-towards [from to]
   (let [tovec (vsub to from)
 	dir (unit-vector tovec)
-	angle (discretize-angle (vang dir) (count *wall-frames*))
+	angle (discretize-angle (vang dir) *wall-sprite*)
 	mag (vmag tovec)]
     {:angle angle :mag (discretize-wall-mag dir mag)}))
 
@@ -199,7 +200,7 @@
   (let [proj (project-wall-towards from to)
 	dir (unit-vector proj)
 	angle (vang dir)
-	sprite (make-oriented-sprite *wall-frames* dir '(0 40))
+	sprite (assoc *wall-sprite* :angle angle)
 	dist (vmag proj)
 	step-size (wall-step-mag dir)
 	steps (/ dist step-size)

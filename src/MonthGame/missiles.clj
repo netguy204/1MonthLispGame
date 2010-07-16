@@ -18,7 +18,7 @@
 
 ;; a rocket is an unguided self-powered projectile
 (defrecord Rocket
-  [start end max-speed]
+  [start end max-speed sprite]
   
   NPE
   (update [npe world dt-secs]
@@ -37,9 +37,7 @@
   
   Entity
   (draw [npe g]
-	(let [dir (unit-vector (vsub end start))
-	      sprite (make-oriented-sprite *rocket-frames* dir)
-	      pos (or (:pos npe) start)]
+	(let [pos (or (:pos npe) start)]
 	  (with-offset-g [g pos]
 	    (draw-sprite g sprite))))
 
@@ -49,7 +47,7 @@
 	    (or (:pos npe) start))
 
   (radius [npe] (* *rocket-radius-factor*
-		   (/ (.getWidth (first *rocket-frames*)) 2)))
+		   (/ (img-height sprite) 2)))
 
   (collided-with [npe other]
 		 (let [dir (unit-vector (vsub end start))]
@@ -58,7 +56,9 @@
 (derive Rocket ::has-age)
 
 (defn make-rocket [start end max-speed]
-  (Rocket. start end max-speed))
+  (let [dir (unit-vector (vsub end start))
+	sprite (make-oriented-sprite *rocket-frames* dir)]
+    (Rocket. start end max-speed sprite)))
 
 (def *max-speed* 300)
 
@@ -127,12 +127,12 @@
 (def *projectile-shadow-img*
      (scale-img (load-img (get-resource "MonthGame/sphere_shadow.png")) 16 16))
 
-(def *acceleration-of-gravity* 200.0)
+(def *acceleration-of-gravity* 120.0)
 
 (defn projectile-eqn [start end age theta]
   (let [d (vdist end start)
 	tan (Math/tan theta)
-	dir (unit-vector d)
+	dir (unit-vector (vsub end start))
 	vz0 (Math/sqrt (/ (* d tan *acceleration-of-gravity*) 2))
 	z (- (* vz0 age) (* 0.5 age age *acceleration-of-gravity*))
 	plane-vel (/ vz0 tan)
@@ -140,7 +140,7 @@
     (list plane-pos z)))
 	
 (defrecord Projectile
-  [start end theta]
+  [start end theta sprite]
 
   NPE
   (update [npe world dt-secs]
@@ -155,9 +155,8 @@
   (draw [npe g]
 	(let [age (or (:age npe) 0)
 	      [pos z] (projectile-eqn start end age theta)
-	      sprite (make-elevated-sprite *projectile-img*
-					   *projectile-shadow-img*
-					   z)]
+	      sprite (assoc sprite :height z)]
+
 	  (with-offset-g [g pos]
 	    (draw-sprite g sprite))))
 	  
@@ -169,7 +168,7 @@
 		  [pp z] (projectile-eqn start end age theta)]
 	      pp))
 
-  (radius [npe] (.getHeight *projectile-img*))
+  (radius [npe] (img-height sprite))
 
   (collided-with [npe other]
 		 (make-radial-explosions (position npe) 10)))
@@ -193,9 +192,12 @@
   (fire [wpn pos target]
 	(play-async *projectile-sound*)
 	(let [dir (unit-vector (vsub target pos))
-	      emit-pos (vadd pos (vadd (vmul dir 20) '(0 -10)))]
-	  
-	  [(Projectile. emit-pos target *default-projectile-theta*)]))
+	      emit-pos (vadd pos (vadd (vmul dir 20) '(0 -10)))
+	      sprite (make-elevated-sprite *projectile-img*
+					   *projectile-shadow-img*
+					   0)]
+
+	  [(Projectile. emit-pos target *default-projectile-theta* sprite)]))
 
   (icon [wpn] *projectile-icon*)
 

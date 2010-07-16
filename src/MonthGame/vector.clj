@@ -130,6 +130,3 @@
 	a2 (add-on-circle a (/ Math/PI 2))]
     (to-vector a2)))
 
-(defn unitdir-for-frame [n total]
-  (to-vector (frame-to-angle n total)))
-

@@ -10,7 +10,7 @@
   (fn [g sprite] (tag-or-class sprite)))
 
 (defn extract-sprite-impl [img n]
-  (let [height (.getHeight img)
+  (let [height (img-height img)
 	simg (make-img height height)
 	bg (.getGraphics simg)
 	sx1 (* height n)
@@ -28,8 +28,7 @@
 
 (defn read-frames [img]
   "read an entire 1d sprite strip into a list of BufferedImages"
-  (let [height (.getHeight img)
-	width (.getWidth img)
+  (let [[width height] (img-size img)
 	numframes (/ width height)
 	frames (doall
 		(for [n (range numframes)]
@@ -38,15 +37,50 @@
 
 (defmethod scale-img ::frames
   [img width height]
-  #^::frames (doall
-	      (for [frame img]
-		(scale-img frame width height))))
+  (let [frames (doall
+		(for [frame img]
+		  (scale-img frame width height)))]
+    (with-meta frames {:tag ::frames})))
+
+(defmethod img-size ::frames
+  [img]
+  (img-size (first img)))
 
 (def load-sprites (comp read-frames load-img))
 
 (defmethod draw-sprite BufferedImage
   [g sprite]
   (draw-img g sprite '(0 0)))
+
+(defn rad-per-frame [total]
+  (/ (* Math/PI 2) total))
+
+(defn- frame-to-angle [n total]
+  (* (rad-per-frame total) n))
+
+(defn- angle-to-frame [angle total]
+  (let [frame (int (Math/round (/ angle (rad-per-frame total))))]
+    (cond
+     (>= frame total) (- frame total)
+     (< frame 0) (+ frame total)
+     true frame)))
+
+(defmulti discretize-angle
+  "return the angle in the discrete form supported by the sprite"
+  (fn [angle sprite] (tag-or-class sprite)))
+
+(defmethod discretize-angle ::oriented-sprite
+  [angle sprite]
+  (let [total (count (:frames sprite))]
+    (frame-to-angle (angle-to-frame angle total) total)))
+
+(defmulti frame-angle-tolerance
+  "the angular error the sprite can exhibit"
+  tag-or-class)
+
+(defmethod frame-angle-tolerance ::oriented-sprite
+  [sprite]
+  (rad-per-frame (count (:frames sprite))))
 
 (defn make-oriented-sprite
   ([frames dir]
@@ -67,10 +101,14 @@
     (with-offset-g [g off]
       (draw-sprite g frame))))
 
+(defmethod img-size ::oriented-sprite
+  [sprite]
+  (img-size (first (:frames sprite))))
+
 (defn make-elevated-sprite [main shadow height]
   #^::elevated-sprite {:main main
-			:shadow shadow
-			:height height})
+		       :shadow shadow
+		       :height height})
 
 (defmethod draw-sprite ::elevated-sprite
   [g sprite]
@@ -79,3 +117,6 @@
     (with-offset-g [g proj-loc]
       (draw-sprite g (:main sprite)))))
 
+(defmethod img-size ::elevated-sprite
+  [sprite]
+  (img-size (:shadow sprite)))

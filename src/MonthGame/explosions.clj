@@ -25,8 +25,7 @@
 	      time-per-frame (/ (float duration) num-frames)
 	      current-frame-no (int (Math/floor (/ time-elapsed time-per-frame)))
 	      current-frame (nth *explode-frames* current-frame-no)
-	      offset (list (/ (.getWidth current-frame) 2)
-			   (/ (.getHeight current-frame) 2))
+	      offset (middle-img *explode-frames*)
 	      pos (vint (vsub (position npe) offset))]
 	  (draw-img g current-frame pos)))
   
@@ -37,7 +36,7 @@
 		  drift-speed (/ (float drift-dist) duration)]
 	      (vint (vadd start {:angle dir :mag (* time-elapsed drift-speed)}))))
 
-  (radius [npe] (/ (.getWidth (first *explode-frames*)) 2))
+  (radius [npe] (/ (img-width *explode-frames*) 2))
 
   (collided-with [npe other] npe))
 	    
