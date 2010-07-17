@@ -8,20 +8,70 @@
     (get-resource (apply str (drop 1 url)))
     (FileInputStream. url)))
 
-(defn- resource-dispatch [resource]
-  (:type resource))
+(defn- type-dispatch [r]
+  (:type r))
 
-(defmulti load-resource resource-dispatch)
+(defmulti load-resource
+  "loads the file data for a resource and passes it on to the detailed loader"
+  type-dispatch)
+
+(defmulti load-img-resource
+  "detail loader for image resources"
+  (fn [r] (:tag r)))
+
+(defmulti compose-resource
+  "compose a resource entry with a map entry to produce a renderable entity"
+  (fn [r m] (list (meta r) (:tag m))))
 
 (defmethod load-resource :img [resource]
-  (assoc resource :data
-	 (load-img (load-resource-file (:file resource)))))
+  (load-img-resource
+   (assoc resource :data
+	  (load-img (load-resource-file (:file resource))))))
+
+(defn- scale-img-for-resource [img resource]
+  (if (:scale resource)
+    (apply scale-img img (:scale resource))
+    img))
+
+(defn- frames-for-resource [resource]
+  (let [frames (read-frames (:data resource))]
+    (scale-img-for-resource frames resource)))
+
+(defn- img-for-resource [resource]
+  (let [img (:data resource)]
+    (scale-img-for-resource img resource)))
+
+(defn- doto-for-resource [resource]
+  (or (:doto resource) '(0 0)))
+
+(defmethod load-img-resource :MonthGame.sprite/static-sprite
+  [resource]
+  (let [sprite (make-static-sprite
+		(img-for-resource resource)
+		(doto-for-resource resource))]
+  (assoc sprite :resource resource)))
+
+(defmethod load-img-resource :MonthGame.sprite/oriented-sprite
+  [resource]
+  (let [sprite (make-oriented-sprite
+		(frames-for-resource resource)
+		0 (doto-for-resource resource))]
+    (assoc sprite :resource resource)))
+
+(def *world-consumed-entries* #{:handle :pos})
+
+(defmethod compose-resource :default
+  [resource entry]
+  (let [entry-overrides (apply dissoc entry *world-consumed-entries*)]
+    (conj resource entry-overrides)))
 
 (defmethod load-resource :sound [resource]
   (assoc resource :data
 	 (read-audio-frames (load-resource-file (:file resource)))))
 
-(defmulti unload-resource resource-dispatch)
+(defmulti unload-resource
+  "remove the non-serializable sections"
+  type-dispatch)
 
 (defmethod unload-resource :default [resource]
   (dissoc resource :data))

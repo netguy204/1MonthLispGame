@@ -4,17 +4,16 @@
 		   missiles explosions entity
 		   weapons sound state-machine
 		   util surface animator world))
+  (:import (javax.swing JFrame JButton JPanel
+			JComboBox ComboBoxModel JLabel
+			ListCellRenderer ImageIcon
+			SwingConstants UIManager JMenuBar)
+	   (java.awt Color Graphics Dimension 
+		     BorderLayout GridBagLayout GridBagConstraints)
+	   (java.awt.image BufferedImage)
+	   (java.awt.event ActionListener)
+	   (javax.swing.event ListDataEvent))
   (:gen-class))
-
-(import '(javax.swing JFrame JButton JPanel
-		      JComboBox ComboBoxModel JLabel
-		      ListCellRenderer ImageIcon
-		      SwingConstants UIManager JMenuBar)
-	'(java.awt Color Graphics Dimension 
-		   BorderLayout GridBagLayout GridBagConstraints)
-	'(java.awt.image BufferedImage)
-	'(java.awt.event ActionListener)
-	'(javax.swing.event ListDataEvent))
 
 (defrecord World
   [tanks current-tank npes])

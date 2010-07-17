@@ -9,6 +9,17 @@
   "draw a sprite to context g"
   (fn [g sprite] (tag-or-class sprite)))
 
+(defn make-static-sprite
+  ([img]
+     (make-static-sprite img '(0 0)))
+  ([img doto]
+     #^::static-sprite {:img img :doto doto}))
+
+(defmethod draw-sprite ::static-sprite
+  [g sprite]
+  (with-offset-g [g (vneg (:doto sprite))]
+    (draw-sprite g (:img sprite))))
+
 (defn extract-sprite-impl [img n]
   (let [height (img-height img)
 	simg (make-img height height)
@@ -23,7 +34,6 @@
     simg))
 
 (def extract-sprite
-     #^{:doc "extract the nth square frame from a 1d sprite sheet"}
      (memoize (fn [img n] (extract-sprite-impl img n))))
 
 (defn read-frames [img]
@@ -120,3 +130,30 @@
 (defmethod img-size ::elevated-sprite
   [sprite]
   (img-size (:shadow sprite)))
+
+(defmulti loop-animation
+  "advance through frames connecting the last to the first"
+  (fn [sprite dt] (tag-or-class sprite)))
+
+(def *default-loop-time* 5) ; seconds
+
+(defmethod loop-animation ::oriented-sprite
+  [sprite dt-secs]
+  (with-age [sprite dt-secs]
+    (println dt-secs)
+    (println (:age sprite))
+    (let [loop-time (or (:loop-time sprite)
+			*default-loop-time*)
+	  twopi (* Math/PI 2)
+	  angle (mod (/ (:age sprite) loop-time) twopi)]
+      (assoc sprite :angle angle))))
+
+(defmethod loop-animation :default
+  [sprite dt-secs]
+  sprite)
+
+(defn advance-animation [sprite dt-secs]
+  (if-let [an-fn (:animation sprite)]
+    (an-fn sprite dt-secs)
+    sprite))
+

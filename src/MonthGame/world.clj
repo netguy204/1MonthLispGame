@@ -11,24 +11,27 @@
 (def *world-resources*
      '({:type :img
 	:file ":MonthGame/jersey_wall.png"
-	:mode :directional
+	:tag :MonthGame.sprite/oriented-sprite
 	:handle :jwall}
+
        {:type :sound
 	:file ":MonthGame/explosion1.mp3"
 	:handle :explode}))
 
 (def *world-map*
-     [{:handle :jwall
-       :pos '(0 0)
-       :orientation (/ Math/PI 4)}
+     [{:handle :jwall ; world reader consumes
+       :pos '(0 0) ; wr consumes
+       :angle (/ Math/PI 4)} ; wr ignores, passed to resource
+
       {:handle :jwall
        :pos '(100 100)
-       :orientation (/ Math/PI 2)}])
+       :angle (/ Math/PI 2)}])
 
 (defn- render-entry [g entry resources]
   (let [resource ((:handle entry) resources)
-	sprite (get-sprite-fn resource)]
-    (sprite g entry)))
+	sprite (compose-resource resource entry)]
+    (with-offset-g [g (:pos entry)]
+      (draw-sprite g sprite))))
 
 (defn- draw-map [g map resources]
   (doseq [entry map]
@@ -86,43 +89,58 @@
 (def *edit-animator* (make-animator #(edit-animation %) 50))
 
 (defn tile-animation [dt-secs state]
-  (let [curr-state @state]
-    (with-age [curr-state dt-secs]
+  (println "tile animation")
+  (dosync
+   (alter state assoc :sprite
+	  (advance-animation (:sprite @state) dt-secs)))
+  (.repaint (:panel @state)))
 
-      (.repaint (:panel curr-state))
-      (ref-set state curr-state))))
-
-(defn tile-draw [g this tile state]
-  (let [w (.getWidth this)
-	h (.getHeight this)]
-    (case (:mode @state)
-	  :static
-	  (draw-img g tile '(0 0))
-
-	  :animated
-	  (doto g
-	    (.setColor (Color/black))
-	    (fill-rect '(0 0) (list w h)))
-
-	  :directional
-	  (doto g
-	    (.setColor (Color/white))
-	    (fill-rect '(0 0) (list w h))))))
+(defn- change-sprite-tag [sprite tag]
+  (let [resource (assoc (unload-resource (:resource sprite)) :tag tag)]
+    (println "new resource is " resource)
+    (assoc (load-resource resource)
+      :animation loop-animation)))
 
 (defn- make-tile-drawer [file]
-  (let [img (load-img (File. file))
-	state (ref {:mode :static})
+  (println "make-tile-drawer")
+  (let [resource {:type :img
+		  :file file
+		  :tag :MonthGame.sprite/static-sprite}
+	sprite (assoc (load-resource resource)
+		 :animation loop-animation)
+	state (ref {:sprite sprite})
 	animator (make-animator #'tile-animation 50)
-	drawer (fn [g this] (tile-draw g this img state))
+	drawer (fn [g this]
+		 (let [w (.getWidth this)
+		       h (.getHeight this)
+		       pos (vint (list (/ w 2) (/ h 2)))]
+		   (fill-rect g '(0 0) (list w h))
+		   (with-offset-g [g pos]
+		     (draw-sprite g (dosync (:sprite @state))))))
 	panel (make-surface drawer)]
 
     (dosync (alter state assoc :panel panel))
     (start-animation animator state)
 
     {:panel panel
-     :set-mode (fn [new-mode] (alter state assoc :mode new-mode))
-     :set-close-handler (fn [frame] (.addWindowListener
-				     frame (stop-animation-listener animator)))}))
+
+     :set-mode
+     (fn [new-mode]
+       (println state)
+       (println "changing sprite tag")
+       (let [old-mode (-> @state :sprite :resource :tag)]
+	 (if (= new-mode old-mode)
+	   (println "already in mode" new-mode)
+	   (do
+	     (println new-mode " is a new mode. Was " old-mode)
+	     (alter state assoc
+		    :sprite (change-sprite-tag (:sprite @state) new-mode))))))
+
+				     
+     :set-close-handler
+     (fn [frame]
+       (.addWindowListener
+	frame (stop-animation-listener animator)))}))
 
 (defn- show-tile-config [file]
   (let [frame (make-window "Tile type")
@@ -131,9 +149,10 @@
     (doto frame
       (.setSize 400 400)
       (.add (:panel drawer) (BorderLayout/CENTER))
-      (.add (make-combo-box [{:name "Static" :fn #(set-mode :static)}
-			     {:name "Animated" :fn #(set-mode :animated)}
-			     {:name "Directional" :fn #(set-mode :directional)}])
+      (.add (make-combo-box [{:name "Static"
+			      :fn #(set-mode :MonthGame.sprite/static-sprite)}
+			     {:name "Directional"
+			      :fn #(set-mode :MonthGame.sprite/oriented-sprite)}])
 	    (BorderLayout/SOUTH))
       ((:set-close-handler drawer))
       (.setVisible true))))
