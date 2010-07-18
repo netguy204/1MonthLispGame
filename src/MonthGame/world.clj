@@ -3,9 +3,11 @@
 		   animator mouse state-machine
 		   util sprite sound resources))
   (:import (java.awt Color BorderLayout)
-	   (javax.swing JMenuBar)
+	   (javax.swing JMenuBar JPanel)
 	   (java.io File FileInputStream)))
 
+
+(def *world-mouse*)
 
 ;; temp data while i design this format
 (def *world-resources*
@@ -40,8 +42,12 @@
 (def *test-world*
      (ref {:resources (load-resources *world-resources*)
 	   :map *world-map*
-	   :current-resource :jwall
-	   :current-meta {:orientation 0}}))
+	   :current-resource :jwall}))
+
+(defn- build-img-asset-bar []
+  (let [panel (JPanel.)
+	sprites (:resources @*test-world*)]
+    nil)) ;; fixme
 
 (defn- world-draw [g this]
   (dosync
@@ -53,10 +59,9 @@
        (.setColor (Color/white))
        (fill-rect '(0 0) (list w h))
        (draw-map map resources))
-     (if (:pos @*mouse*)
+     (if (:pos @*world-mouse*)
        nil)))) ; dostuff
        
-
 (def *world-surface*)
 (defn- world-surface []
   (defonce *world-surface*
@@ -66,21 +71,28 @@
 (def *edit-machine* (create-machine :tiles [] 
 				    :current-tile nil))
 
+
 (defn place-current-tile [machine]
   ;; replace world current tile with tile from machine
   (println "current tile is" (:current-tile @machine)))
 
 (def edit-transitions
      {:init
-      [{:cond #(:button1down @*mouse*)
+      [{:cond #(:button1down @*world-mouse*)
 	:next-state :wait-for-release}
        {:default true :next-state :init}]
 
       :wait-for-release
-      [{:cond #(not (:button1down @*mouse*))
+      [{:cond #(not (:button1down @*world-mouse*))
 	:action #(place-current-tile %)
 	:next-state :init}
        {:default true :next-state :wait-for-release}]})
+
+(defn- on-mouse-wheel [mouse ev]
+  (let [event (if (< (.getWheelRotation ev) 0) :wheel-up :wheel-down)]
+    (update-state-with-event *edit-machine* edit-transitions event)))
+
+(def *world-mouse* (make-mouse #'on-mouse-wheel))
 
 (defn edit-animation [dt-secs]
   (let [next-state (update-state *edit-machine* edit-transitions)]
@@ -190,5 +202,5 @@
       (.add panel)
       (.setJMenuBar (build-menu *main-menu* (JMenuBar.)))
       (.setVisible true))
-    (attach-mouse-adapter panel (make-mouse-adapter *mouse*))
+    (attach-mouse-adapter panel (make-mouse-adapter *world-mouse*))
     (start-animation *edit-animator*)))

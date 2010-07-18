@@ -3,11 +3,12 @@
 
 (import '(java.awt.event MouseAdapter MouseEvent))
 
-(defstruct mouse-struct :pos :button1down :button2down :lastevent :scroll-pos)
-(defn make-mouse []
-  (ref (struct mouse-struct nil false false 0)))
+(defstruct mouse-struct :pos :button1down :button2down :lastevent :on-wheel)
 
-(def *mouse* (make-mouse))
+(defn make-mouse [on-wheel]
+  (ref (struct mouse-struct nil false false on-wheel)))
+
+(def *mouse* (make-mouse (fn [m ev] nil)))
 
 (defn button-to-sym [button]
   (cond
@@ -30,9 +31,7 @@
 		   :pos (point-to-vec (.getPoint ev)))
     :pressed (update-click mouse ev true)
     :released (update-click mouse ev false)
-    :scrolled (alter mouse assoc
-		     :scroll-pos (+ (:scroll-pos @mouse)
-				    (.getWheelRotation ev))))))
+    :scrolled ((:on-wheel @mouse) mouse ev))))
    
 (defn make-mouse-adapter [mouse]
      (proxy [MouseAdapter] []
