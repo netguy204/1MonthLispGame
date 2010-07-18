@@ -13,6 +13,9 @@
 (defn incr-cyclic [n max]
   (mod (+ n 1) max))
 
+(defn decr-cyclic [n max]
+  (if (= n 0) (- max 1) (dec n)))
+
 (defn >>> [v n]
   (MonthGame.BitShift/unsignedShiftRight v n))
 

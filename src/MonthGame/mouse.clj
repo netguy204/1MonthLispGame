@@ -5,10 +5,12 @@
 
 (defstruct mouse-struct :pos :button1down :button2down :lastevent :on-wheel)
 
-(defn make-mouse [on-wheel]
-  (ref (struct mouse-struct nil false false on-wheel)))
+(defn nil-on-wheel [m ev] nil)
 
-(def *mouse* (make-mouse (fn [m ev] nil)))
+(defn make-mouse [on-wheel]
+  (ref (struct mouse-struct nil false false nil on-wheel)))
+
+(def *mouse* (make-mouse nil-on-wheel))
 
 (defn button-to-sym [button]
   (cond

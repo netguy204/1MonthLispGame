@@ -4,7 +4,9 @@
   (first (filter pred coll)))
 
 (defn- valid-transition? [transition]
-  (or (:default transition) ((:cond transition))))
+  (or (:default transition)
+      (if-let [cond-fn (:cond transition)]
+	(cond-fn))))
 
 (defn- valid-transition-for-event? [transition event]
   (or (:default transition) (= (:event transition) event)))
@@ -21,7 +23,8 @@
   
 (defn update-state-with-event [machine transitions event & action_args]
   (let [candidates ((:state @machine) transitions)
-	match (find-first valid-transition-for-event? candidates)]
+	match (find-first #(valid-transition-for-event? % event)
+			  candidates)]
     (if (:action match) (apply (:action match) machine action_args))
     (apply-transition machine match)))
 

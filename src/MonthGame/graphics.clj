@@ -15,7 +15,6 @@
 (defn img-height [img] (second (img-size img)))
 
 (defn load-img [stream]
-  (println "loading image from " stream)
   (ImageIO/read stream))
 
 (defmacro with-new-graphics [graphics & forms]

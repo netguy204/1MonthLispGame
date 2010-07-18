@@ -1,7 +1,8 @@
 (ns MonthGame.world
   (:use (MonthGame surface draw vector graphics
 		   animator mouse state-machine
-		   util sprite sound resources))
+		   util sprite sound resources
+		   scalar-math))
   (:import (java.awt Color BorderLayout)
 	   (javax.swing JMenuBar JPanel)
 	   (java.io File FileInputStream)))
@@ -14,6 +15,7 @@
      '({:type :img
 	:file ":MonthGame/jersey_wall.png"
 	:tag :MonthGame.sprite/oriented-sprite
+	:doto (0 40)
 	:handle :jwall}
 
        {:type :sound
@@ -29,15 +31,19 @@
        :pos '(100 100)
        :angle (/ Math/PI 2)}])
 
+(defn build-sprite [entry resources]
+  (let [resource ((:handle entry) resources)]
+    (compose-resource resource entry)))
+
 (defn- render-entry [g entry resources]
-  (let [resource ((:handle entry) resources)
-	sprite (compose-resource resource entry)]
+  (let [sprite (build-sprite entry resources)]
     (with-offset-g [g (:pos entry)]
       (draw-sprite g sprite))))
 
 (defn- draw-map [g map resources]
-  (doseq [entry map]
-    (render-entry g entry resources)))
+  (let [sorted (sort-by #(second (:pos %)) map)]
+    (doseq [entry sorted]
+      (render-entry g entry resources))))
 
 (def *test-world*
      (ref {:resources (load-resources *world-resources*)
@@ -49,6 +55,18 @@
 	sprites (:resources @*test-world*)]
     nil)) ;; fixme
 
+
+(def *edit-machine*
+     (create-machine :current-entry
+		     {:handle :jwall
+		      :angle 0}))
+
+(defn- entry-for-mouse []
+  (if-let [mouse-pos (:pos @*world-mouse*)]
+    (assoc (:current-entry @*edit-machine*)
+      :pos mouse-pos)
+    (:current-entry @*edit-machine*)))
+
 (defn- world-draw [g this]
   (dosync
    (let [w (.getWidth this)
@@ -59,8 +77,8 @@
        (.setColor (Color/white))
        (fill-rect '(0 0) (list w h))
        (draw-map map resources))
-     (if (:pos @*world-mouse*)
-       nil)))) ; dostuff
+     (if-let [mouse-pos (:pos @*world-mouse*)]
+       (render-entry g (entry-for-mouse) resources)))))
        
 (def *world-surface*)
 (defn- world-surface []
@@ -68,18 +86,35 @@
     (make-surface #(world-draw %1 %2)))
   *world-surface*)
 
-(def *edit-machine* (create-machine :tiles [] 
-				    :current-tile nil))
+(defn- place-current-tile [machine]
+  (let [map (:map @*test-world*)
+	new-map (cons (entry-for-mouse) map)]
+    (alter *test-world* assoc :map new-map)))
 
-
-(defn place-current-tile [machine]
-  ;; replace world current tile with tile from machine
-  (println "current tile is" (:current-tile @machine)))
+(defn- change-current-frame [machine dir]
+  "assumes current-entry corresponds to an oriented sprite"
+  (println "change-current-frame")
+  (let [entry (:current-entry @machine)
+	resource ((:handle entry) (:resources @*test-world*))
+	num-frames (count (:frames resource))
+	curr-frame (angle-to-frame (:angle entry) num-frames)
+	next-frame (case dir
+			 :prev-frame (decr-cyclic curr-frame num-frames)
+			 :next-frame (incr-cyclic curr-frame num-frames))
+	new-entry (assoc entry :angle (frame-to-angle next-frame num-frames))]
+    (alter machine assoc :current-entry new-entry)))
+    
 
 (def edit-transitions
      {:init
       [{:cond #(:button1down @*world-mouse*)
 	:next-state :wait-for-release}
+       {:event :wheel-up
+	:action #(change-current-frame % :prev-frame)
+	:next-state :init}
+       {:event :wheel-down
+	:action #(change-current-frame % :next-frame)
+	:next-state :init}
        {:default true :next-state :init}]
 
       :wait-for-release
@@ -174,10 +209,11 @@
   (show-tile-config file))
 
 (defn- open-text-file [file]
-  (println "some text!"))
+  (dosync
+   (alter *test-world* assoc :map (read-string (slurp file)))))
 
 (defn- open-file []
-  (let [specs [{:type ["A text file" "txt" "clj"] :fn #'open-text-file}
+  (let [specs [{:type ["A text file" "map"] :fn #'open-text-file}
 	       {:type ["An image" "jpg" "jpeg" "png"] :fn #'open-image-file}]]
     (open-selector-then-invoke specs (world-surface))))
 

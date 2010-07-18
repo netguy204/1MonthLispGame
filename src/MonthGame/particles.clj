@@ -144,7 +144,7 @@
 (defn- update-test-particles [particles dt-secs]
   (flatten (filter #(not (nil? %)) (map #(update % nil dt-secs) particles))))
 
-(def *test-mouse* (make-mouse))
+(def *test-mouse* (make-mouse nil-on-wheel))
 
 (defn- test-animation [dt-secs]
   (dosync

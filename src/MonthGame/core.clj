@@ -3,7 +3,9 @@
 		   tank scalar-math mouse
 		   missiles explosions entity
 		   weapons sound state-machine
-		   util surface animator world))
+		   util surface animator world
+		   resources)
+	(clojure.contrib duck-streams))
   (:import (javax.swing JFrame JButton JPanel
 			JComboBox ComboBoxModel JLabel
 			ListCellRenderer ImageIcon
@@ -149,29 +151,6 @@
     (.dispose bg)
     (.drawImage g img 0 0 nil)))
 
-(def *wall-sprite*
-     (let [img-stream (get-resource "MonthGame/jersey_wall.png")
-	   frames (scale-img (load-sprites img-stream) 160 160)]
-       (make-oriented-sprite frames 0 '(0 40))))
-
-(defn- wall-step-mag [dir]
-  (* (first (img-size *wall-sprite*)) 0.6))
-
-(defn- discretize-wall-mag [dir mag]
-  (let [step-size (wall-step-mag dir)
-	num-times (Math/round (/ mag step-size))]
-    (* num-times step-size)))
-
-(defn- project-wall-towards [from to]
-  (let [tovec (vsub to from)
-	dir (unit-vector tovec)
-	angle (discretize-angle (vang dir) *wall-sprite*)
-	mag (vmag tovec)]
-    {:angle angle :mag (discretize-wall-mag dir mag)}))
-
-(defn- closest-point-towards [from to]
-  (vadd from (project-wall-towards from to)))
-
 (defn- make-wall-entity [sprite pos]
   (let [wall (reify
 	      Entity
@@ -187,6 +166,15 @@
     (derive (class wall) ::wall)
     wall))
 
+(def *resources* (load-resources MonthGame.world/*world-resources*))
+
+(defn- load-map [file]
+  (let [data (read-string (slurp* file))]
+    (doall
+     (for [entry data]
+       (make-wall-entity (build-sprite entry *resources*)
+			 (:pos entry))))))
+	
 (defmethod MonthGame.entity/intersect [MonthGame.missiles.Rocket ::wall] [e1 e2]
   (if (circle-intersect e1 e2)
     true
@@ -195,46 +183,10 @@
 (defmethod MonthGame.entity/intersect [MonthGame.missiles.Projectile ::wall] [e1 e2]
   false)
 
-(defn- make-wall-entities [from to]
-  (let [proj (project-wall-towards from to)
-	dir (unit-vector proj)
-	angle (vang dir)
-	sprite (assoc *wall-sprite* :angle angle)
-	dist (vmag proj)
-	step-size (wall-step-mag dir)
-	steps (/ dist step-size)
-	step (vmul dir step-size)]
-
-    (map #(make-wall-entity sprite %)
-	 (map #(vadd from (vmul step %)) (range steps)))))
-
-(defn- path-to-entities [path]
-  (let [pairs (zip (drop 1 path) (drop-last path))]
-    (mapcat #(make-wall-entities (first %) (second %)) pairs)))
-
-(defn game-init-draw [g this]
-  (let [width (.getWidth this)
-	height (.getHeight this)]
-    (doto g
-      (game-running-draw this)
-      (.setColor (. Color black))
-      (draw-text-lines 300 0 "WORLD EDIT MODE"))
-    (if-let* 
-     [meta (world-mode-meta @*my-world* nil)]
-     [path (:path @meta)]
-     (let [to-mouse
-	   (if-let [pos (:pos @*mouse*)]
-	     (try (make-wall-entities (first path) pos)
-		  (catch java.lang.ArithmeticException e nil)))
-	   walls (concat (path-to-entities path) to-mouse)]
-       (doseq [ent (sort-by ypos-for-entity walls)]
-	 (draw ent g))))))
-
 (defn my-draw [g this]
   (dosync
    (case (world-mode @*my-world*)
-	 :init (game-init-draw g this)
-	 :running (game-running-draw g this))))
+	 :init (game-running-draw g this))))
 
 (defn charge-for-fire [tank dt-secs]
    (let [max-range (range-for-energy (default-weapon tank)
@@ -270,11 +222,11 @@
        {:default true :next-state :init}]
 
       :moving
-      [{:cond #(:button1down @*mouse*)
+      [{:cond #(and (:button1down @*mouse*)
+		    (can-move? @(current-tank)))
 	:action (fn [m dt] (alter (current-tank) move-towards-cursor @*mouse* dt))
 	:next-state :moving}
-       {:cond #(not (:button1down @*mouse*))
-	:next-state :init}]
+       {:default true :next-state :init}]
 
       :charging
       [{:cond #(:button2down @*mouse*)
@@ -289,7 +241,7 @@
 (defn update-tank! [tank world dt-secs]
   (let [machine (world-mode-meta @*my-world* (create-machine))]
     (update-state machine tank-motion dt-secs)
-    (alter *my-world* change-world-mode :running machine)))
+    (alter *my-world* change-world-mode :init machine)))
 
 (defn change-player! [world]
   (alter (current-tank) reset-tank-energy)
@@ -331,53 +283,10 @@
   ; honor any changes that other logic made to state
   (world-mode @*my-world*))
 
-(def draw-walls
-     {:init
-      [{:cond #(:button1down @*mouse*)
-	:next-state :wait-for-release}
-       {:default true :next-state :init}]
-      
-      :wait-for-release
-      [{:cond #(not (:button1down @*mouse*))
-	:action #(alter % assoc :path 
-			(if-let [path (:path (deref %))]
-			  (let [nextpt (closest-point-towards 
-					(first path)
-					(:pos @*mouse*))]
-			    (if (not= nextpt (first path))
-				      (cons nextpt path)
-				      path))
-			  (list (:pos @*mouse*))))
-	:next-state :drawing-wall}
-       {:default true :next-state :wait-for-release}]
-
-      :drawing-wall
-      [{:cond #(:button1down @*mouse*)
-	:next-state :wait-for-release}
-       {:cond #(:button2down @*mouse*)
-	:next-state :finish-exit}
-       {:default true :next-state :drawing-wall}]
-
-      :finish-exit
-      [{:cond #(not (:button2down @*mouse*))
-	:next-state nil}
-       {:default true :next-state :finish-exit}]})
-
-(defn- init-animation [dt-secs]
-  (let [machine (world-mode-meta @*my-world* (create-machine))
-	next-state (update-state machine draw-walls)]
-    (if (nil? next-state)
-      (if-let [path (:path @machine)]
-	(do
-	  (alter *my-world* assoc :barriers (path-to-entities path))
-	  (alter *my-world* change-world-mode :running nil)))
-      (alter *my-world* change-world-mode :init machine))))
-
 (defn animation [dt-secs]
   (dosync
    (case (world-mode @*my-world*)
-	 :init (init-animation dt-secs)
-	 :running (game-animation dt-secs)))
+	 :init (game-animation dt-secs)))
 
   (.repaint *my-panel*))
 
@@ -387,22 +296,25 @@
   (let [img-stream (get-resource "MonthGame/tanksprite.png")
 	frames (scale-img (load-sprites img-stream) 128 128)
 	tank1 (ref (make-tank frames '(0 15)
-			      (/ Math/PI 4) '(64 64)))
+			      (/ Math/PI 4) '(30 64)))
 	tank2 (ref (make-tank frames '(0 15)
-			      (/ (* 2 Math/PI) 3) '(300 300)))]
+			      (/ (* 5 Math/PI) 4) '(750 450)))]
     ; add the players to the world
     (dosync
      (alter tank1 assoc
-	    :weapons [(make-rocket-launcher 5)
-		      (make-multirocket-launcher 10 5)
+	    :weapons [(make-rocket-launcher 10)
+		      (make-multirocket-launcher 2 5)
 		      (make-projectile-launcher)]
 	    :current-weapon 0)
      (alter tank2 assoc
-	    :weapons [(make-rocket-launcher 7)]
+	    :weapons [(make-rocket-launcher 10)
+		      (make-multirocket-launcher 2 5)
+		      (make-projectile-launcher)]
 	    :current-weapon 0)
      (alter *my-world* assoc
 	    :tanks (vector tank1 tank2)
 	    :current-tank 0
+	    :barriers (load-map (get-resource "MonthGame/wavy-world.map"))
 	    :npes []))))
 
 (def *game-menu*
