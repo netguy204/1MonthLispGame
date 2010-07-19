@@ -43,7 +43,13 @@
 	  dt-secs (/ dt 1000)]
       (dosync
        (apply (:anim-fn animator) dt-secs args))
-      (Thread/sleep (max 0 (- (:max-sleep animator) dt)))
+
+      ; sleep off the rest of our timeslice
+      (let [run-time (- (System/currentTimeMillis)
+			(dosync @(:clock animator)))]
+	(Thread/sleep (max 0 (- (:max-sleep animator) run-time))))
+
+      ; and then wake up our agent again
       (apply send-off *agent* #'animation-step animator args)
       true)
     false))

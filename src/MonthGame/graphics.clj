@@ -33,17 +33,17 @@
 (defn img-height [img] (second (img-size img)))
 
 (defn load-img [stream]
-  (ImageIO/read stream))
+  #^BufferedImage (ImageIO/read stream))
 
 (defmacro with-new-graphics [#^Graphics2D graphics & forms]
-  `(let [~graphics (.create ~graphics)
+  `(let [#^Graphics2D ~graphics (.create ~graphics)
 	 result# (do ~@forms)]
      (.dispose ~graphics)
      result#))
 
 (defmacro with-offset-g [[#^Graphics2D graphics offset] & forms]
-  `(let [[x# y#] (vint ~offset)]
-     (with-new-graphics ~graphics
+  `(with-new-graphics ~graphics
+    (let [[#^int x# #^int y#] (vint ~offset)]
        (.translate ~graphics x# y#)
        ~@forms)))
     

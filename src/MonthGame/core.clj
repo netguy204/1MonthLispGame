@@ -136,7 +136,7 @@
 		     (format "Move energy:     %.1f" move)
 		     (format "Fire energy:       %.1f" fire))))
 
-(defn draw-background [#^Graphics2D g width height]
+(defn draw-background [g width height]
   (draw-img g *background-image* '(0 0)))
   
 (defn game-running-draw [#^Graphics2D g #^JPanel this]
@@ -266,7 +266,7 @@
   (alter world make-next-tank-current)
   (notify-weapon-listeners))
 
-(def *my-panel* (make-surface my-draw))
+(def #^JPanel *my-panel* (make-surface my-draw))
 
 (defn update-npe [npe f & args]
   (alter *my-world* assoc :npes

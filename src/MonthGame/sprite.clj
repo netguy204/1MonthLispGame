@@ -33,7 +33,7 @@
      #^::static-sprite {:img img :doto doto}))
 
 (defmethod draw-sprite ::static-sprite
-  [#^Graphics2D g sprite]
+  [g sprite]
   (with-offset-g [g (vneg (:doto sprite))]
     (draw-sprite g (:img sprite))))
 
@@ -85,7 +85,7 @@
 (defn frame-to-angle [n total]
   (* (rad-per-frame total) n))
 
-(defn angle-to-frame [#^Float angle #^Integer total]
+(defn angle-to-frame [angle total]
   (let [frame (int (Math/round (/ angle (rad-per-frame total))))]
     (cond
      (>= frame total) (- frame total)
@@ -119,7 +119,7 @@
 			  :doto (to-vector doto)}))
 
 (defmethod draw-sprite ::oriented-sprite
-  [#^Graphics2D g sprite]
+  [g sprite]
   (let [angle (:angle sprite)
 	frames (:frames sprite)
 	frameno (angle-to-frame angle (count frames))
@@ -138,7 +138,7 @@
 		       :height height})
 
 (defmethod draw-sprite ::elevated-sprite
-  [#^Graphics2D g sprite]
+  [g sprite]
   (let [proj-loc (list 0 (neg (:height sprite)))]
     (draw-sprite g (:shadow sprite))
     (with-offset-g [g proj-loc]

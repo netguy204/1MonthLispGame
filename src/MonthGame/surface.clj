@@ -24,7 +24,7 @@
 
 (defn make-surface [draw-fn]
   (proxy [JPanel] []
-    (paint [g] (draw-fn g this))))
+    (paint [#^Graphics2D g] (draw-fn g this))))
 
 (defn make-window [title & opts]
   (let [frame (JFrame. title)]
