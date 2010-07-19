@@ -1,8 +1,25 @@
+;; particles.clj
+;; Turn based tank combat game
+;;
+;; Copyright 2010 Brian Taylor
+;;
+;; Licensed under the Apache License, Version 2.0 (the "License");
+;; you may not use this file except in compliance with the License.
+;; You may obtain a copy of the License at
+;;
+;;     http://www.apache.org/licenses/LICENSE-2.0
+;;
+;; Unless required by applicable law or agreed to in writing, software
+;; distributed under the License is distributed on an "AS IS" BASIS,
+;; WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+;; See the License for the specific language governing permissions and
+;; limitations under the License.
+
 (ns MonthGame.particles
   (:use (MonthGame entity vector util graphics
 		   draw scalar-math sprite
 		   surface mouse animator))
-  (:import (java.awt Color Graphics Dimension
+  (:import (java.awt Color Graphics2D Dimension
 		     AlphaComposite)))
 
 (def *drag-factor* 0.3)
@@ -16,7 +33,7 @@
 	(assoc p :pos pos :vel vel))))
 
 (defn make-simple-draw [imgs]
-  (fn [p g]
+  (fn [p #^Graphics2D g]
     (let [age-factor (max 0.0 (min 1.0 (/ (:age p) (:max-age p))))
 	alpha (- 1 age-factor)
 	num-frames (count imgs)
@@ -69,7 +86,8 @@
 	(Particle. pos vel update-fn draw (max-age-fn))))))
 
 (defn- load-with-scales [fname scales]
-  (doall (map #(scale-img (load-img (get-resource fname)) % %) scales)))
+  (let [img (load-img (get-resource fname))]
+    (doall (map #(scale-img img % %) scales))))
 
 (def *max-age* 2)
 (defn- constant-max-age []

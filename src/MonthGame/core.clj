@@ -1,4 +1,25 @@
+;; core.clj
+;; Turn based tank combat game
+;;
+;; Copyright 2010 Brian Taylor
+;;
+;; Licensed under the Apache License, Version 2.0 (the "License");
+;; you may not use this file except in compliance with the License.
+;; You may obtain a copy of the License at
+;;
+;;     http://www.apache.org/licenses/LICENSE-2.0
+;;
+;; Unless required by applicable law or agreed to in writing, software
+;; distributed under the License is distributed on an "AS IS" BASIS,
+;; WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+;; See the License for the specific language governing permissions and
+;; limitations under the License.
+
+;; be noisy if i do dumb things
+;(set! *warn-on-reflection* true)
+
 (ns MonthGame.core
+  (:refer-clojure :exclude [spit])
   (:use (MonthGame vector sprite draw graphics
 		   tank scalar-math mouse
 		   missiles explosions entity
@@ -10,7 +31,7 @@
 			JComboBox ComboBoxModel JLabel
 			ListCellRenderer ImageIcon
 			SwingConstants UIManager JMenuBar)
-	   (java.awt Color Graphics Dimension 
+	   (java.awt Color Graphics2D Dimension 
 		     BorderLayout GridBagLayout GridBagConstraints)
 	   (java.awt.image BufferedImage)
 	   (java.awt.event ActionListener)
@@ -115,14 +136,14 @@
 		     (format "Move energy:     %.1f" move)
 		     (format "Fire energy:       %.1f" fire))))
 
-(defn draw-background [g width height]
+(defn draw-background [#^Graphics2D g width height]
   (.drawImage g *background-image* 0 0 nil))
   
-(defn game-running-draw [g this]
+(defn game-running-draw [#^Graphics2D g #^JPanel this]
   (let [width (.getWidth this)
 	height (.getHeight this)
 	img (make-img width height)
-	bg (.getGraphics img)]
+	#^Graphics2D bg (.getGraphics img)]
 
     ;; clear backgroud
     (doto bg
@@ -156,7 +177,7 @@
 	      Entity
 	      (draw
 	       [entity g]
-	       (with-offset-g [g pos]
+	       (with-offset-g [#^Graphics2D g pos]
 		 (draw-sprite g sprite)))
 
 	      (draw-meta [entity g] nil)

@@ -1,7 +1,25 @@
+;; graphics.clj
+;; Turn based tank combat game
+;;
+;; Copyright 2010 Brian Taylor
+;;
+;; Licensed under the Apache License, Version 2.0 (the "License");
+;; you may not use this file except in compliance with the License.
+;; You may obtain a copy of the License at
+;;
+;;     http://www.apache.org/licenses/LICENSE-2.0
+;;
+;; Unless required by applicable law or agreed to in writing, software
+;; distributed under the License is distributed on an "AS IS" BASIS,
+;; WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+;; See the License for the specific language governing permissions and
+;; limitations under the License.
+
 (ns MonthGame.graphics
   (:use (MonthGame vector util))
   (:import (javax.imageio ImageIO)
-	   (java.awt.image BufferedImage)))
+	   (java.awt.image BufferedImage)
+	   (java.awt Graphics2D)))
 
 (defmulti scale-img
   "scale an image like thing"
@@ -17,14 +35,14 @@
 (defn load-img [stream]
   (ImageIO/read stream))
 
-(defmacro with-new-graphics [graphics & forms]
+(defmacro with-new-graphics [#^Graphics2D graphics & forms]
   `(let [~graphics (.create ~graphics)
 	 result# (do ~@forms)]
      (.dispose ~graphics)
      result#))
 
-(defmacro with-offset-g [[graphics offset] & forms]
-  `(let [[x# y#] (vfloat ~offset)]
+(defmacro with-offset-g [[#^Graphics2D graphics offset] & forms]
+  `(let [[x# y#] (vint ~offset)]
      (with-new-graphics ~graphics
        (.translate ~graphics x# y#)
        ~@forms)))
@@ -33,17 +51,16 @@
   (new BufferedImage width height (. BufferedImage TYPE_INT_ARGB)))
 
 (defn middle-img [img]
-  (let [width (img-width img)
-	height (img-height img)]
+  (let [[width height] (img-size img)]
     (list (/ width 2) (/ height 2))))
 
 (defmethod scale-img BufferedImage
-  [img new-width new-height]
+  [#^BufferedImage img new-width new-height]
 
   (let [width (img-width img)
 	height (img-height img)
 	new-img (make-img new-width new-height)
-	bg (.getGraphics new-img)]
+	#^Graphics2D bg (.getGraphics new-img)]
     (doto bg
       (.drawImage img
 		  0 0 new-width new-height
@@ -52,5 +69,5 @@
     new-img))
 
 (defmethod img-size BufferedImage
-  [img]
+  [#^BufferedImage img]
   (list (.getWidth img) (.getHeight img)))

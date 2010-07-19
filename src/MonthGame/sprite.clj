@@ -1,7 +1,24 @@
+;; sprite.clj
+;; Turn based tank combat game
+;;
+;; Copyright 2010 Brian Taylor
+;;
+;; Licensed under the Apache License, Version 2.0 (the "License");
+;; you may not use this file except in compliance with the License.
+;; You may obtain a copy of the License at
+;;
+;;     http://www.apache.org/licenses/LICENSE-2.0
+;;
+;; Unless required by applicable law or agreed to in writing, software
+;; distributed under the License is distributed on an "AS IS" BASIS,
+;; WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+;; See the License for the specific language governing permissions and
+;; limitations under the License.
+
 (ns MonthGame.sprite
   (:use (MonthGame scalar-math vector 
 		   graphics draw util))
-  (:import (java.awt Color Graphics Dimension)
+  (:import (java.awt Color Graphics2D Dimension)
 	   (java.awt.image BufferedImage)
 	   (java.io File)))
 
@@ -16,7 +33,7 @@
      #^::static-sprite {:img img :doto doto}))
 
 (defmethod draw-sprite ::static-sprite
-  [g sprite]
+  [#^Graphics2D g sprite]
   (with-offset-g [g (vneg (:doto sprite))]
     (draw-sprite g (:img sprite))))
 
@@ -102,7 +119,7 @@
 			  :doto (to-vector doto)}))
 
 (defmethod draw-sprite ::oriented-sprite
-  [g sprite]
+  [#^Graphics2D g sprite]
   (let [angle (:angle sprite)
 	frames (:frames sprite)
 	frameno (angle-to-frame angle (count frames))
@@ -121,7 +138,7 @@
 		       :height height})
 
 (defmethod draw-sprite ::elevated-sprite
-  [g sprite]
+  [#^Graphics2D g sprite]
   (let [proj-loc (list 0 (neg (:height sprite)))]
     (draw-sprite g (:shadow sprite))
     (with-offset-g [g proj-loc]
