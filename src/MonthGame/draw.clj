@@ -17,7 +17,8 @@
 
 (ns MonthGame.draw
   (:use MonthGame.vector)
-  (:import (java.awt Graphics2D)))
+  (:import (java.awt Graphics2D)
+	   (java.awt.image BufferedImage)))
 
 (defn draw-line [#^Graphics2D g start end]
   (let [[ox oy] start
@@ -42,8 +43,8 @@
 	     zp
 	     (map #(* Math/PI 2 (/ % (float elems))) (concat (range 1 elems) (list 0)))))))
      
-(defn draw-img [#^Graphics2D g img pos]
-  (let [[x y] pos]
+(defn draw-img [#^Graphics2D g #^BufferedImage img pos]
+  (let [[x y] (vint pos)]
     (.drawImage g img x y nil)))
 
 (defn draw-text-lines [#^Graphics2D g x y & lines]

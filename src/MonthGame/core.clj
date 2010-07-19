@@ -137,16 +137,14 @@
 		     (format "Fire energy:       %.1f" fire))))
 
 (defn draw-background [#^Graphics2D g width height]
-  (.drawImage g *background-image* 0 0 nil))
+  (draw-img g *background-image* '(0 0)))
   
 (defn game-running-draw [#^Graphics2D g #^JPanel this]
   (let [width (.getWidth this)
-	height (.getHeight this)
-	img (make-img width height)
-	#^Graphics2D bg (.getGraphics img)]
+	height (.getHeight this)]
 
     ;; clear backgroud
-    (doto bg
+    (doto g
       (.setColor (. Color white))
       (.fillRect 0 0 width height)
       (.setColor (. Color black))
@@ -154,38 +152,37 @@
     
     ;; draw pointer
     (if (:pos @*mouse*)
-      (draw-circle bg (:pos @*mouse*) 30 30))
+      (draw-circle g (:pos @*mouse*) 30 30))
     
     ;; draw the meta layer
     (with-each-entity @*my-world* entity
-      (draw-meta entity bg))
+      (draw-meta entity g))
     
     ;; draw the entity layer
     (with-each-entity @*my-world* entity
-      (draw entity bg))
+      (draw entity g))
     
     ;; draw hud
-    (doto bg
+    (doto g
       (.setColor (. Color black))
-      (draw-hud @*my-world*))
-  
-    (.dispose bg)
-    (.drawImage g img 0 0 nil)))
+      (draw-hud @*my-world*))))
+
+(defrecord Wall
+  [sprite pos]
+
+  Entity
+  (draw
+   [entity g]
+   (with-offset-g [g pos]
+     (draw-sprite g sprite)))
+
+  (draw-meta [entity g] nil)
+  (position [entity] pos)
+  (radius [entity] 0)
+  (collided-with [entity other] entity))
 
 (defn- make-wall-entity [sprite pos]
-  (let [wall (reify
-	      Entity
-	      (draw
-	       [entity g]
-	       (with-offset-g [#^Graphics2D g pos]
-		 (draw-sprite g sprite)))
-
-	      (draw-meta [entity g] nil)
-	      (position [entity] pos)
-	      (radius [entity] 0)
-	      (collided-with [entity other] entity))]
-    (derive (class wall) ::wall)
-    wall))
+  (Wall. sprite pos))
 
 (def *resources* (load-resources MonthGame.world/*world-resources*))
 
@@ -196,12 +193,12 @@
        (make-wall-entity (build-sprite entry *resources*)
 			 (:pos entry))))))
 	
-(defmethod MonthGame.entity/intersect [MonthGame.missiles.Rocket ::wall] [e1 e2]
+(defmethod MonthGame.entity/intersect [MonthGame.missiles.Rocket Wall] [e1 e2]
   (if (circle-intersect e1 e2)
     true
     false))
 
-(defmethod MonthGame.entity/intersect [MonthGame.missiles.Projectile ::wall] [e1 e2]
+(defmethod MonthGame.entity/intersect [MonthGame.missiles.Projectile Wall] [e1 e2]
   false)
 
 (defn my-draw [g this]

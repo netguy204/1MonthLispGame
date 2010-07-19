@@ -85,7 +85,7 @@
 (defn frame-to-angle [n total]
   (* (rad-per-frame total) n))
 
-(defn angle-to-frame [angle total]
+(defn angle-to-frame [#^Float angle #^Integer total]
   (let [frame (int (Math/round (/ angle (rad-per-frame total))))]
     (cond
      (>= frame total) (- frame total)

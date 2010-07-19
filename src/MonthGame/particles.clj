@@ -34,7 +34,7 @@
 
 (defn make-simple-draw [imgs]
   (fn [p #^Graphics2D g]
-    (let [age-factor (max 0.0 (min 1.0 (/ (:age p) (:max-age p))))
+    (let [age-factor (max 0.0 (min 1.0 (/ (float (:age p)) (:max-age p))))
 	alpha (- 1 age-factor)
 	num-frames (count imgs)
 	frameno (int (min (dec num-frames) (max 0 (* num-frames age-factor))))
