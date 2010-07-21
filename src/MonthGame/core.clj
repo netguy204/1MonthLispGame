@@ -1,5 +1,5 @@
 ;; core.clj
-;; Turn based tank combat game
+;; sets up the world and contains the program entry point
 ;;
 ;; Copyright 2010 Brian Taylor
 ;;
@@ -15,9 +15,9 @@
 ;; See the License for the specific language governing permissions and
 ;; limitations under the License.
 
+(declare *my-world*)
 ;; be noisy if i do dumb things
 ;(set! *warn-on-reflection* true)
-
 (ns MonthGame.core
   (:refer-clojure :exclude [spit])
   (:use (MonthGame vector sprite draw graphics
@@ -25,7 +25,7 @@
 		   missiles explosions entity
 		   weapons sound state-machine
 		   util surface animator world
-		   resources)
+		   resources wall)
 	(clojure.contrib duck-streams))
   (:import (javax.swing JFrame JButton JPanel
 			JComboBox ComboBoxModel JLabel
@@ -167,23 +167,6 @@
       (.setColor (. Color black))
       (draw-hud @*my-world*))))
 
-(defrecord Wall
-  [sprite pos]
-
-  Entity
-  (draw
-   [entity g]
-   (with-offset-g [g pos]
-     (draw-sprite g sprite)))
-
-  (draw-meta [entity g] nil)
-  (position [entity] pos)
-  (radius [entity] 0)
-  (collided-with [entity other] entity))
-
-(defn- make-wall-entity [sprite pos]
-  (Wall. sprite pos))
-
 (def *resources* (load-resources MonthGame.world/*world-resources*))
 
 (defn- load-map [file]
@@ -193,14 +176,6 @@
        (make-wall-entity (build-sprite entry *resources*)
 			 (:pos entry))))))
 	
-(defmethod MonthGame.entity/intersect [MonthGame.missiles.Rocket Wall] [e1 e2]
-  (if (circle-intersect e1 e2)
-    true
-    false))
-
-(defmethod MonthGame.entity/intersect [MonthGame.missiles.Projectile Wall] [e1 e2]
-  false)
-
 (defn my-draw [g this]
   (dosync
    (case (world-mode @*my-world*)
@@ -242,7 +217,9 @@
       :moving
       [{:cond #(and (:button1down @*mouse*)
 		    (can-move? @(current-tank)))
-	:action (fn [m dt] (alter (current-tank) move-towards-cursor @*mouse* dt))
+	:action (fn [m dt] (alter (current-tank)
+				  move-towards-cursor @*mouse* 
+				  (:barriers @*my-world*) dt))
 	:next-state :moving}
        {:default true :next-state :init}]
 

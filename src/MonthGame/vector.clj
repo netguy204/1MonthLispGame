@@ -42,9 +42,8 @@
   (cond
    (seq? val) ::seq
    (number? val) ::number
-   (map? val) ::angle-mag
    (vector? val) ::seq
-   true :default))
+   true (or (:tag (meta val)) (class val))))
 
 (defmulti to-vector
   "convert the given form to a vector"
@@ -58,7 +57,7 @@
 	c (Math/cos theta)]
     (unit-vector-impl (vector (* c 2) s))))
 
-(defmethod to-vector ::angle-mag [v]
+(defmethod to-vector clojure.lang.PersistentArrayMap [v]
   (let [{ angle :angle, mag :mag} v]
     (vmul-impl (to-vector angle) mag)))
 
@@ -119,6 +118,9 @@
 
 (defn plane-eqn [normal position test]
   "returns zero for points in plane"
+  (vdot normal (vsub test position)))
+
+(defn plane-eqn2 [normal position test]
   (let [[nx ny] (to-vector normal)
 	[px py] position
 	[tx ty] test]
@@ -127,6 +129,7 @@
 (defn is-past? [target test-pt dir]
   "is test-pt past target given it's traveling in the dir direction?"
   (> (plane-eqn dir target test-pt) 0))
+
 
 (defn vec? [v]
   (let [[x y] v]

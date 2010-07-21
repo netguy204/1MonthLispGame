@@ -18,7 +18,7 @@
 (ns MonthGame.tank
   (:use (MonthGame vector scalar-math sprite
 		   draw entity weapons missiles
-		   graphics))
+		   graphics wall))
   (:import (java.awt Color)))
 
 (defn tank-target-pos [tank]
@@ -158,7 +158,10 @@
   (and (not (can-move? tank))
        (not (can-fire? tank))))
 
-(defn move-towards-cursor [tank mouse dt-secs]
+(defn- tank-barrier-collision? [pos radius barriers]
+    (first (filter #(wall-hit-correction pos radius %) barriers)))
+
+(defn move-towards-cursor [tank mouse barriers dt-secs]
   (let [to-mouse (vsub (:pos mouse) (position tank))
 	tank-dir (discretize-angle (:angle tank) (:sprite tank))
 	dxscale (* (:move-rate tank) dt-secs)
@@ -166,22 +169,28 @@
 	dtscale (* (:rotate-rate tank) dt-secs rotate-dir)
 	dtheta (vang to-mouse tank-dir)]
 
-    ;; only move if we're not where the mouse is
-    (if (> (vmag to-mouse) 50)
-      (if (within dtheta (frame-angle-tolerance (:sprite tank)))
+      ; only move if we're not where the mouse is
+      (if (> (vmag to-mouse) 50)
 
-	;; drive forward, we're as accurate in angle as we can be
-	(-> tank
-	    (assoc 
-		:pos (vadd (position tank) (vmul tank-dir dxscale)))
-	    (subtract-move-energy dxscale)
-	    (subtract-fire-energy (* 2 dxscale)))
+	; drive forward unless collision
+	(if (within dtheta (frame-angle-tolerance (:sprite tank)))
+	  (if-let [wall (tank-barrier-collision? (position tank)
+						 (radius tank) barriers)]
+	    (assoc tank :pos (vadd (position tank)
+				   (vmul (away-from-wall-norm wall (position tank)) 5)))
 
-	;; turn to face the cursor
-	(-> tank
-	    (assoc
-		:angle (add-on-circle (:angle tank) dtscale))
-	    (subtract-move-energy (* dtscale 0.1))))
+	    ; drive forward, we're as accurate in angle as we can be
+	    (-> tank
+		(assoc 
+		    :pos (vadd (position tank) (vmul tank-dir dxscale)))
+		(subtract-move-energy dxscale)
+		(subtract-fire-energy (* 2 dxscale))))
+
+	    ; turn to face the cursor
+	    (-> tank
+		(assoc
+		    :angle (add-on-circle (:angle tank) dtscale))
+		(subtract-move-energy (* dtscale 0.1))))
       tank)))
 
 (defn age [ent]

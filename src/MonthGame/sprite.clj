@@ -132,6 +132,10 @@
   [sprite]
   (img-size (first (:frames sprite))))
 
+(defmethod to-vector ::oriented-sprite
+  [sprite]
+  (to-vector (:angle sprite)))
+
 (defn make-elevated-sprite [main shadow height]
   #^::elevated-sprite {:main main
 		       :shadow shadow
