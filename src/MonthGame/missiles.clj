@@ -48,7 +48,7 @@
 		vel (vmul dir spd)
 		newpos (vadd (position npe) (vmul vel dt-secs))]
 	    (if (is-past? end (position npe) dir)
-	      (make-explosion end dir)
+	      (make-particle-explosion end dir 6 0.5)
 	      (list (emit-basic-particle newpos vel)
 		    (assoc npe :pos newpos :age age)))))
   
@@ -68,7 +68,7 @@
 
   (collided-with [npe other]
 		 (let [dir (unit-vector (vsub end start))]
-		   (list (make-explosion (position npe) (vneg dir))))))
+		   (make-particle-explosion (position npe) (vneg dir) 4 1.5))))
 
 (derive Rocket ::has-age)
 

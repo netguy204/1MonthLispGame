@@ -18,7 +18,7 @@
 (ns MonthGame.explosions
   (:use (MonthGame vector draw sprite
 		   entity sound util
-		   graphics)))
+		   graphics particles)))
 
 (def *explode-frames*
      (let [img-stream (get-resource "MonthGame/explode.png")]
@@ -69,3 +69,26 @@
   (play-async *explosion-sound*)
   (let [skip-size (/ (* Math/PI 2) num)]
     (map (fn [idx] (Explosion. pos (* idx skip-size) 60 1)) (range num))))
+
+(defrecord FireEmitter
+  [pos vel emit emitter-life]
+
+  NPE
+  (update [npe world dt-secs]
+	  (with-age [npe dt-secs]
+	    (if (> (:age npe) (:emitter-life npe)) nil
+		(list npe (emit pos vel)))))
+  Entity
+  (draw [p g] nil)
+  (draw-meta [p g] nil)
+  (position [p] pos)
+  (radius [p] 0)
+  (collided-with [p other] p))
+
+(defn make-particle-explosion [pos vel max-particles emitter-life]
+  (let [emit (make-radial-emitter *fire-particles*
+				  6 30 drift-up
+				  (make-max-age-spread 1 3))]
+    (play-async *explosion-sound*)
+    (FireEmitter. pos vel emit emitter-life)))
+

@@ -88,11 +88,11 @@
 
 	(Particle. pos vel update-fn draw (max-age-fn))))))
 
-(defn make-radial-emitter [imgs max-speed update-fn max-age-fn]
+(defn make-radial-emitter [imgs max-particles max-speed update-fn max-age-fn]
   "emit a partical in a random radial direction"
   (let [draw (make-simple-draw imgs)]
     (fn [pos vel]
-      (for [_ (range (inc (rand-int 6)))]
+      (for [_ (range (inc (rand-int max-particles)))]
 	(let [vel {:angle (unit-vector (rand-around-zero Math/PI))
 		   :mag (rand-around-zero max-speed)}]
 	  (Particle. pos vel update-fn draw (max-age-fn)))))))
@@ -105,7 +105,7 @@
 (defn- constant-max-age []
   *max-age*)
 
-(defn- make-max-age-spread [min max]
+(defn make-max-age-spread [min max]
   (fn [] (+ min (rand (- max min)))))
 
 (def *smoke-particles*
@@ -148,6 +148,7 @@
 (def emit-fire-particle
      (make-radial-emitter
       *fire-particles*
+      6
       30
       drift-up
       (make-max-age-spread 1 3)))
