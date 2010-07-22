@@ -92,9 +92,9 @@
   "emit a partical in a random radial direction"
   (let [draw (make-simple-draw imgs)]
     (fn [pos vel]
-      (dotimes [_ (rand-int 5)]
-	(let [dir (unit-vector (rand-around-zero Math/PI))
-	      vel (vmul dir (rand-around-zero max-speed))]
+      (for [_ (range (inc (rand-int 6)))]
+	(let [vel {:angle (unit-vector (rand-around-zero Math/PI))
+		   :mag (rand-around-zero max-speed)}]
 	  (Particle. pos vel update-fn draw (max-age-fn)))))))
 
 (defn- load-with-scales [fname scales]
@@ -124,7 +124,7 @@
 (def *fire-particles*
      (load-with-scales
        "MonthGame/fire.png"
-       (range 16 128 4)))
+       (range 16 96 4)))
 
 
 ;; at the moment this looks pretty dumb
@@ -141,16 +141,16 @@
 
 (defn drift-up [p world dt-secs]
   (if (too-old? p) nil
-      (let [vel (:vel p)
+      (let [vel (vadd (:vel p) (list 0 (neg (:age p))))
 	    pos (vadd (position p) (vmul vel dt-secs))]
 	(assoc p :pos pos :vel vel))))
 
 (def emit-fire-particle
      (make-radial-emitter
       *fire-particles*
-      10
+      30
       drift-up
-      (make-max-age-spread 2 5)))
+      (make-max-age-spread 1 3)))
 
 ;; a partical system test program that makes the pointer
 ;; into an emitter for whatever system is defiend by
@@ -176,7 +176,7 @@
   *test-surface*)
 
 (defn- update-test-particles [particles dt-secs]
-  (flatten (filter #(not (nil? %)) (map #(update % nil dt-secs) particles))))
+  (filter #(not (nil? %)) (flatten (map #(update % nil dt-secs) particles))))
 
 (def *test-mouse* (make-mouse nil-on-wheel))
 
