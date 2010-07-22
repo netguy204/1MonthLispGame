@@ -254,15 +254,26 @@
 (declare animation)
 
 (defn- game-animation [dt-secs]
+  "update the world structure during gameplay"
   (let [tank (current-tank)]
     ;; update npes
     (alter *my-world* update-npes dt-secs)
-    
-    ;; TODO check collisions between npes and walls
+
+    ;; check collisions between tanks and barriers
+    (with-each-collision [tank (map deref (:tanks @*my-world*))
+			  barrier (:barriers @*my-world*)]
+      (with-ref-for tank
+	[tank-ref (:tanks @*my-world*)]
+	(alter tank-ref assoc
+	       :pos (vadd (position tank)
+			  (vmul (away-from-wall-norm barrier
+						     (position tank))
+				5)))))
+	       
+    ;; check collisions between npes and barriers
     (with-each-collision [npe (:npes @*my-world*)
 			  barrier (:barriers @*my-world*)]
       (update-npe npe collided-with npe barrier))
-    ;; TODO check collisions between tanks and walls
 
     ;; check collisions between npes and tanks
     (with-each-collision [npe (:npes @*my-world*)
@@ -336,14 +347,16 @@
     (.setRenderer *weapon-selector* *weapon-list-renderer*)
 
     (doto main-window
-      (.setSize 800 600)
       (.setJMenuBar (build-menu *game-menu* (JMenuBar.)))
-      (.add panel (. BorderLayout CENTER))
+      (.add (doto panel 
+	      (.setPreferredSize (Dimension. 800 600)))
+	    (. BorderLayout CENTER))
       (.add (doto (new JPanel)
 	      (.setLayout (new BorderLayout))
 	      (.add *weapon-selector* (. BorderLayout LINE_START))
 	      (.add end-turn-button (. BorderLayout CENTER)))
 	    (. BorderLayout SOUTH))
+      (.pack)
       (.setVisible true))
 
     ;; start the background music

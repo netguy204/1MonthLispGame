@@ -24,8 +24,11 @@
 
 (def *drag-factor* 0.3)
 
+(defn too-old? [p]
+  (if (> (:age p) (:max-age p)) true false))
+
 (defn simple-drag [p world dt-secs]
-  (if (> (:age p) (:max-age p)) nil
+  (if (too-old? p) nil
       (let [old-pos (position p)
 	    old-vel (:vel p)
 	    pos (vadd old-pos (vmul old-vel dt-secs))
@@ -85,6 +88,15 @@
 
 	(Particle. pos vel update-fn draw (max-age-fn))))))
 
+(defn make-radial-emitter [imgs max-speed update-fn max-age-fn]
+  "emit a partical in a random radial direction"
+  (let [draw (make-simple-draw imgs)]
+    (fn [pos vel]
+      (dotimes [_ (rand-int 5)]
+	(let [dir (unit-vector (rand-around-zero Math/PI))
+	      vel (vmul dir (rand-around-zero max-speed))]
+	  (Particle. pos vel update-fn draw (max-age-fn)))))))
+
 (defn- load-with-scales [fname scales]
   (let [img (load-img (get-resource fname))]
     (doall (map #(scale-img img % %) scales))))
@@ -127,13 +139,17 @@
 	      [fire (emit-basic-particle (:pos p) new-vel)])
       fire)))
 
+(defn drift-up [p world dt-secs]
+  (if (too-old? p) nil
+      (let [vel (:vel p)
+	    pos (vadd (position p) (vmul vel dt-secs))]
+	(assoc p :pos pos :vel vel))))
+
 (def emit-fire-particle
-     (make-basic-emitter 
+     (make-radial-emitter
       *fire-particles*
-      50
       10
-      0
-      simple-drag
+      drift-up
       (make-max-age-spread 2 5)))
 
 ;; a partical system test program that makes the pointer

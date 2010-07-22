@@ -73,10 +73,12 @@
 (defn away-from-wall-dir [wall pos]
   (unit-vector (vsub pos (position wall))))
 
-(defmethod MonthGame.entity/intersect [MonthGame.missiles.Rocket Wall] [e1 e2]
+(defmethod MonthGame.entity/intersect [MonthGame.missiles.Rocket Wall]
+  [e1 e2]
   (if-let [encr (wall-hit-correction (position e1) 5.0 e2)]
     (if (> encr 0) true false)))
 
-(defmethod MonthGame.entity/intersect [MonthGame.missiles.Projectile Wall] [e1 e2]
+(defmethod MonthGame.entity/intersect [MonthGame.missiles.Projectile Wall]
+  [e1 e2]
   false)
 
