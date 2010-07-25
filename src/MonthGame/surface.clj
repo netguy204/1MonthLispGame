@@ -16,11 +16,16 @@
 ;; limitations under the License.
 
 (ns MonthGame.surface
-  (:use (MonthGame util))
+  (:refer-clojure :exclude [spit])
+  (:use (MonthGame util)
+	(clojure.contrib duck-streams swing-utils))
   (:import (javax.swing JPanel JFrame JFileChooser
-			JMenu JMenuItem JComboBox)
+			JMenu JMenuItem JComboBox
+			JDialog Box JTextPane
+			JButton JScrollPane)
 	   (javax.swing.filechooser FileFilter FileView)
 	   (java.awt.event ActionListener)))
+
 
 (defn make-surface [draw-fn]
   (proxy [JPanel] []
@@ -148,3 +153,27 @@
     (.addActionListener combo listener)
     combo))
 
+(defn help-html-dialog [parent title src]
+  (let [dialog (JDialog. parent title false)
+	vbox (Box/createVerticalBox)
+	hbox (Box/createHorizontalBox)
+	text (JTextPane.)]
+    
+    (doto text
+      (.setEditable false)
+      (.setContentType "text/html")
+      (.setText (slurp* src)))
+    
+    (doto vbox
+      (.add (Box/createGlue))
+      (.add (JScrollPane. text))
+      (.add 
+       (doto hbox
+	 (.add (Box/createGlue))
+	 (.add (doto (JButton. "Close")
+		 (add-action-listener (fn [ev] (.setVisible dialog false))))))))
+    
+    (doto dialog
+      (.add vbox)
+      (.setSize 400 500)
+      (.setVisible true))))

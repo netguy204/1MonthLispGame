@@ -103,8 +103,11 @@
   agent)
 
 (defn play-async [f-rec]
-  (defonce *audio* (agent (get-line-for-format (get-default-format))))
-  (send *audio* play-preloaded-command f-rec))
+  (try
+   (defonce *audio* (agent (get-line-for-format (get-default-format))))
+   (send *audio* play-preloaded-command f-rec)
+   (catch Exception ex
+     (println "no sound output available"))))
 
 (defn play-stream [stream & opts]
   "stream an mp3 file from disk through the audio system"

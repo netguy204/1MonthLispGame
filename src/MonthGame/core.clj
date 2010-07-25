@@ -26,7 +26,7 @@
 		   weapons sound state-machine
 		   util surface animator world
 		   resources wall)
-	(clojure.contrib duck-streams))
+	(clojure.contrib duck-streams swing-utils))
   (:import (javax.swing JFrame JButton JPanel
 			JComboBox ComboBoxModel JLabel
 			ListCellRenderer ImageIcon
@@ -216,7 +216,8 @@
 
       :moving
       [{:cond #(and (:button1down @*mouse*)
-		    (can-move? @(current-tank)))
+		    (can-move? @(current-tank))
+		    (:pos @*mouse*))
 	:action (fn [m dt] (alter (current-tank)
 				  move-towards-cursor @*mouse* 
 				  (:barriers @*my-world*) dt))
@@ -298,6 +299,13 @@
 
 (def *animator* (make-animator animation 50))
 
+(defn- standard-weapons-load []
+  [(make-rocket-launcher 10)
+   (make-multirocket-launcher 2 5)
+   (make-projectile-launcher)])
+
+(def *default-map* ":MonthGame/wavy-world.map")
+
 (defn- init-world []
   (let [img-stream (get-resource "MonthGame/tanksprite.png")
 	frames (scale-img (load-sprites img-stream) 128 128)
@@ -308,24 +316,44 @@
     ; add the players to the world
     (dosync
      (alter tank1 assoc
-	    :weapons [(make-rocket-launcher 10)
-		      (make-multirocket-launcher 2 5)
-		      (make-projectile-launcher)]
+	    :weapons (standard-weapons-load)
 	    :current-weapon 0)
      (alter tank2 assoc
-	    :weapons [(make-rocket-launcher 10)
-		      (make-multirocket-launcher 2 5)
-		      (make-projectile-launcher)]
+	    :weapons (standard-weapons-load)
 	    :current-weapon 0)
      (alter *my-world* assoc
 	    :tanks (vector tank1 tank2)
 	    :current-tank 0
-	    :barriers (load-map (get-resource "MonthGame/wavy-world.map"))
+	    :barriers (load-map (load-resource-file *default-map*))
 	    :npes []))))
 
+(def *main-window*
+     (make-window "Month Game" :close-on-exit))
+
+(defn- select-map-and-init []
+  (open-selector-then-invoke
+   [{:type MonthGame.world/*map-file-type*
+     :fn (fn [map]
+	   (println "using resource " map)
+	   (binding [*default-map* map]
+	     (init-world)))}]
+   *main-window*))
+
+(defn how-to-play []
+  (help-html-dialog *main-window* "How-to-Play"
+		    (get-resource "MonthGame/how-to-play.html")))
+
 (def *game-menu*
-     [["Tests" [["Particle test..." #(MonthGame.particles/particle-test-window)]
-		["World designer..." #(MonthGame.world/world-designer)]]]])
+     [["Game"
+       [["World designer..." #(MonthGame.world/world-designer)]
+	["Start new game" #(init-world)]
+	["Load map..." #(select-map-and-init)]
+	["Quit" #(System/exit 0)]]]
+      ["Experimental"
+       [["Particle test..." #(MonthGame.particles/particle-test-window)]]]
+      ["Help"
+       [["How to play..." #(how-to-play)]]]])
+	
 
 (defn -main [& args]
   (let [panel *my-panel*
@@ -334,7 +362,7 @@
 			 (actionPerformed
 			  [ev]
 			  (dosync (change-player! *my-world*))))
-	main-window (make-window "Month Game" :close-on-exit)]
+	main-window *main-window*]
 
     (init-world)
     (.addActionListener end-turn-button button-clicked)

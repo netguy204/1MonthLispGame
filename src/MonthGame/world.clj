@@ -229,31 +229,42 @@
   (dosync
    (alter *test-world* assoc :map (read-string (slurp file)))))
 
+(def *map-file-type* ["A text file" "map"])
+
 (defn- open-file []
-  (let [specs [{:type ["A text file" "map"] :fn #'open-text-file}
-	       {:type ["An image" "jpg" "jpeg" "png"] :fn #'open-image-file}]]
+  (let [specs [{:type *map-file-type* :fn #'open-text-file}]]
     (open-selector-then-invoke specs (world-surface))))
 
 (defn- save-file []
-  (println "save"))
+  (if-let [target (save-selector (world-surface) *map-file-type*)]
+    (spit target (dosync (:map @*test-world*)))))
+
+(def *world-frame*)
 
 (defn- about-program []
-  (println "about"))
+  (help-html-dialog *world-frame* "Using World Designer"
+		    (get-resource "MonthGame/using-world-designer.html")))
+
+(defn- clear-surface []
+  (dosync
+   (alter *test-world* assoc :map [])))
 
 (def *main-menu*
      [["File" [["Open..." #(open-file)]
-	       ["Save..." #(save-file)]]]
-      ["Help" [["About..." #(about-program)]]]])
+	       ["Save..." #(save-file)]
+	       ["Clear surface" #(clear-surface)]]]
+      ["Help" [["Instructions..." #(about-program)]]]])
 
 (defn world-designer []
-  (let [frame (make-window "World Designer")
-	panel (world-surface)
-	close-handler (stop-animation-listener *edit-animator*)]
-    (doto frame
-      (.addWindowListener close-handler)
-      (.setSize 800 600)
-      (.add panel)
-      (.setJMenuBar (build-menu *main-menu* (JMenuBar.)))
-      (.setVisible true))
-    (attach-mouse-adapter panel (make-mouse-adapter *world-mouse*))
-    (start-animation *edit-animator*)))
+  (binding [*world-frame* (make-window "World Designer")]
+    (let [frame *world-frame*
+	  panel (world-surface)
+	  close-handler (stop-animation-listener *edit-animator*)]
+      (doto frame
+	(.addWindowListener close-handler)
+	(.setSize 800 600)
+	(.add panel)
+	(.setJMenuBar (build-menu *main-menu* (JMenuBar.)))
+	(.setVisible true))
+      (attach-mouse-adapter panel (make-mouse-adapter *world-mouse*))
+      (start-animation *edit-animator*))))

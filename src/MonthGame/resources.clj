@@ -20,7 +20,7 @@
 		   sound sprite))
   (:import (java.io File FileInputStream)))
 
-(defn- load-resource-file [url]
+(defn load-resource-file [url]
   (if (= (nth url 0) \:)
     (get-resource (apply str (drop 1 url)))
     (FileInputStream. url)))
