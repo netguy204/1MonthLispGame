@@ -85,10 +85,11 @@
   (radius [p] 0)
   (collided-with [p other] p))
 
-(defn make-particle-explosion [pos vel max-particles emitter-life]
+(defn make-particle-explosion [pos vel max-particles emitter-life & opts]
   (let [emit (make-radial-emitter *fire-particles*
 				  6 30 drift-up
 				  (make-max-age-spread 1 3))]
-    (play-async *explosion-sound*)
+    (when-not (some #{:no-sound} opts)
+      (play-async *explosion-sound*))
     (FireEmitter. pos vel emit emitter-life)))
 

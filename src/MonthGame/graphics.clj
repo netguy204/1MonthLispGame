@@ -19,7 +19,8 @@
   (:use (MonthGame vector util))
   (:import (javax.imageio ImageIO)
 	   (java.awt.image BufferedImage)
-	   (java.awt Graphics2D)))
+	   (java.awt Graphics2D)
+	   (javax.swing JComponent)))
 
 (defmulti scale-img
   "scale an image like thing"
@@ -71,3 +72,7 @@
 (defmethod img-size BufferedImage
   [#^BufferedImage img]
   (list (.getWidth img) (.getHeight img)))
+
+(defmethod img-size JComponent
+  [#^JComponent c]
+  (list (.getWidth c) (.getHeight c)))

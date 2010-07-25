@@ -48,12 +48,17 @@
 	#^ImageObserver obs nil]
     (.drawImage g img x y obs)))
 
-(defn draw-text-lines [g x y & lines]
-  (let [height (-> g (.getFontMetrics) (.getHeight))
+(defn draw-text [g pos line]
+  (let [[x y] pos]
+    (.drawString g line x y)))
+
+(defn draw-text-lines [g pos & lines]
+  (let [[x y] pos
+	height (-> g (.getFontMetrics) (.getHeight))
 	y0 (+ y height)]
     (dorun
      (for [lineno (range (count lines))]
        (let [ly (+ y0 (* lineno height))
 	     line (nth lines lineno)]
-	 (.drawString g	line x ly))))))
+	 (draw-text g (list x ly) line))))))
 

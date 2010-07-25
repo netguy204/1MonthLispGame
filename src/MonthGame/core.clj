@@ -54,12 +54,6 @@
 (defn- world-mode [world]
   (or (:mode world) :init))
 
-(defn- world-mode-meta [world default]
-  (or (:mode-meta world) default))
-
-(defn- change-world-mode [world mode meta]
-  (assoc world :mode mode :mode-meta meta))
-
 (defn num-weapons [tank]
   (count (:weapons tank)))
 
@@ -131,7 +125,7 @@
 	player (+ 1 (:current-tank world))
 	move (float (:move-energy @current))
 	fire (float (:fire-energy @current))]
-    (draw-text-lines g (- 800 200) 0
+    (draw-text-lines g (list (- 800 200) 0)
 		     (format "Current player:  %d" player)
 		     (format "Move energy:     %.1f" move)
 		     (format "Fire energy:       %.1f" fire))))
@@ -167,6 +161,30 @@
       (.setColor (. Color black))
       (draw-hud @*my-world*))))
 
+(defn game-over-draw [g this]
+  (let [width (.getWidth this)
+	height (.getHeight this)]
+
+    (doto g
+      ;; draw the old game screen
+      (game-running-draw this)
+
+      ;; fade it a bit by drawing a alpha'd rect over
+      (.setColor (Color. 0 0 0 172))
+      (fill-rect '(0 0) (list width height))
+      (.setColor (. Color white)))
+
+    ;; draw the winner text
+    (let [tanks (:tanks @*my-world*)
+	  tanknums (range (count tanks))
+	  winner (last (sort-by (fn [tank] (:life-energy @tank)) tanks))
+	  winner-num (first (filter
+			     (fn [idx] (= (nth tanks idx) winner)) tanknums))]
+      (draw-text g (middle-img this)
+		       (format "Player %d wins!" (inc winner-num))))))
+
+;;"Select File | Start new game to play again")))))
+			
 (def *resources* (load-resources MonthGame.world/*world-resources*))
 
 (defn- load-map [file]
@@ -179,7 +197,8 @@
 (defn my-draw [g this]
   (dosync
    (case (world-mode @*my-world*)
-	 :init (game-running-draw g this))))
+	 :init (game-running-draw g this)
+	 :game-over (game-over-draw g this))))
 
 (defn charge-for-fire [tank dt-secs]
    (let [max-range (range-for-energy (default-weapon tank)
@@ -234,10 +253,11 @@
 		  (alter (current-tank) assoc :charge 0))
 	:next-state :init}]})
 	
-(defn update-tank! [tank world dt-secs]
-  (let [machine (world-mode-meta @*my-world* (create-machine))]
+(defn update-tank! [tank dt-secs]
+  (let [machine (or (:update-machine @*my-world*)
+		    (create-machine))]
     (update-state machine tank-motion dt-secs)
-    (alter *my-world* change-world-mode :init machine)))
+    (alter *my-world* assoc :update-machine machine)))
 
 (defn change-player! [world]
   (alter (current-tank) reset-tank-energy)
@@ -253,6 +273,11 @@
 		      (apply f args))))
 
 (declare animation)
+
+(defn- dead-tanks []
+  (let [tanks (:tanks @*my-world*)]
+    (filter (fn [tank] (= (:life-energy @tank) 0))
+	    (:tanks @*my-world*))))
 
 (defn- game-animation [dt-secs]
   "update the world structure during gameplay"
@@ -285,15 +310,37 @@
 	(alter tank-ref damage npe)))
     
     ;; animate the current player
-    (update-tank! tank *my-world* dt-secs))
+    (update-tank! tank dt-secs))
   
-  ; honor any changes that other logic made to state
-  (world-mode @*my-world*))
+  ;; did anyone die?
+  (when (> (count (dead-tanks)) 0)
+    (println (map (fn [tank] (:life-energy @tank)) (dead-tanks)))
+    (alter *my-world* assoc :mode :game-over)))
+
+(defn- rand-up-to [max]
+  (* (rand) max))
+
+(defn- game-over-animation [dt-secs]
+  ;; update npes
+  (alter *my-world* update-npes dt-secs)
+
+  ;; start random explosions on the dead tanks
+  (doseq [tank (dead-tanks)]
+    (when (> (rand) 0.95)
+      (let [pos (vadd (position @tank)
+		      {:angle (rand-up-to (* 2 Math/PI))
+		       :mag (rand-up-to (radius @tank))})
+	    vel {:angle (rand-up-to (* 2 Math/PI))
+		 :mag (rand-up-to 10)}]
+	(alter *my-world* assoc :ni-npes
+	       (cons (make-particle-explosion pos vel 2 1.0 :no-sound)
+		       (:ni-npes @*my-world*)))))))
 
 (defn animation [dt-secs]
   (dosync
    (case (world-mode @*my-world*)
-	 :init (game-animation dt-secs)))
+	 :init (game-animation dt-secs)
+	 :game-over (game-over-animation dt-secs)))
 
   (.repaint *my-panel*))
 
@@ -325,7 +372,8 @@
 	    :tanks (vector tank1 tank2)
 	    :current-tank 0
 	    :barriers (load-map (load-resource-file *default-map*))
-	    :npes []))))
+	    :npes []
+	    :mode :init))))
 
 (def *main-window*
      (make-window "Month Game" :close-on-exit))
