@@ -375,8 +375,10 @@
 	    :npes []
 	    :mode :init))))
 
-(def *main-window*
-     (make-window "Month Game" :close-on-exit))
+(defn- main-window []
+  (defonce *main-window*
+    (make-window "Month Game" :close-on-exit))
+  *main-window*)
 
 (defn- select-map-and-init []
   (open-selector-then-invoke
@@ -385,18 +387,17 @@
 	   (println "using resource " map)
 	   (binding [*default-map* map]
 	     (init-world)))}]
-   *main-window*))
+   (main-window)))
 
 (defn how-to-play []
-  (help-html-dialog *main-window* "How-to-Play"
+  (help-html-dialog (main-window) "How-to-Play"
 		    (get-resource "MonthGame/how-to-play.html")))
 
 (def *game-menu*
      [["Game"
        [["World designer..." #(MonthGame.world/world-designer)]
 	["Start new game" #(init-world)]
-	["Load map..." #(select-map-and-init)]
-	["Quit" #(System/exit 0)]]]
+	["Load map..." #(select-map-and-init)]]]
       ["Experimental"
        [["Particle test..." #(MonthGame.particles/particle-test-window)]]]
       ["Help"
@@ -409,8 +410,7 @@
 	button-clicked (proxy [ActionListener] []
 			 (actionPerformed
 			  [ev]
-			  (dosync (change-player! *my-world*))))
-	main-window *main-window*]
+			  (dosync (change-player! *my-world*))))]
 
     (init-world)
     (.addActionListener end-turn-button button-clicked)
@@ -422,7 +422,7 @@
     (.setModel *weapon-selector* *weapon-list-model*)
     (.setRenderer *weapon-selector* *weapon-list-renderer*)
 
-    (doto main-window
+    (doto (main-window)
       (.setJMenuBar (build-menu *game-menu* (JMenuBar.)))
       (.add (doto panel 
 	      (.setPreferredSize (Dimension. 800 600)))
