@@ -1,17 +1,41 @@
-# MonthGame
+Postmortem. The installation instructions are on the wiki.
 
-FIXME: write description
+I wrote TB Tanks for ILGE2010. TB stands for "turn based" and also happens to be a transposition of my initials. Clojure was my dialect. The game should work on any 1.5 or better JVM.
 
-## Usage
+This has been fun!
 
-FIXME: write
+I've really enjoyed participating in ILGE2010 and am especially thankful for the friendly and technically excellent community I infiltrated in the process.
 
-## Installation
+This is my first >100 line Lisp project. I've read countless tutorials and PG evangelism essays and I've even worked through the first chapter or so of SICP and written my own junky lisp dialect but I didn't really "get it" until now. This project has opened my eyes to the infinite flexibility of the lisp family of languages and the community of creative and exploring minds that gives them life.
 
-FIXME: write
+This community rocks. Thank you all.
 
-## License
 
-Copyright (C) 2010 FIXME
+What went well:
 
-Distributed under the Eclipse Public License, the same as Clojure.
+* I always have too many projects going on at once but this was a rare case where I was able to stay focused and interested in one thing for the majority of the expo. My attention only really disappeared when my copy of PAIP came in the mail.
+
+* I developed in spurts that were typically about an evening long. I started each spurt with a goal I thought could be achieved in the time and I ended with something functional at the end of each.
+
+* Almost every other spurt was focused on cleaning up code and abstracting code and concept duplication I had failed to noticed during the previous spurt.
+
+* I made many releases. About every other spurt or when I could make a screen shot that looked cool in some new and interesting way. This led to me doing lots of bragging on IRC which really helped to keep me motivated.
+
+* Building graphical effects is fun and it's nice to be able to brag and demonstrate cool stuff to non-programmers. I found that it helps keep me motivated. My wife is a non-programmer so being able to show her something graphical and take advantage of her inspirations as well made this even more enjoyable to work on.
+
+* The Lisp development work-flow is a thing of beauty. Lisp + Slime is a far more effective development environment than Java + Eclipse (my day job.) After each evening of coding in the promised land of Lisp I was pretty disappointed to have to spend the following day in the Java desert. It was a bit like going repeatedly going back into Plato's cave and having to pretend that I didn't know what all the shadows really were.
+
+What Went Badly:
+
+* Every time I sat down and focused on designing something general ("proper" software design) I ended up taking forever and producing something useless. Every time I just coded like a monkey on fire I ended up with something dead-ugly that I could then abstract and generalize into something broadly useful. I had to rediscover this truth at least 3 times. I should have done more flaming-monkey and less aspiring architect.
+
+* Speaking of monkey like critters: The Java sound API was designed by lemurs and documented by them as well. That was 5 days of zero fun.
+
+* While I'm griping about bad code: The JLayer API (which, I gather is the favorite java hotness for decoding mp3's) is not well designed. I lost a good 2 days to an undocumented side-effect of a particular function call. (I really didn't expect it to be trashing my decode buffer behind my back. Sheesh guys! At least document that sort of thing!)
+
+* I didn't spend the time optimizing that I should have. This is an unusual mistake for me since usually I optimize too early and before I have hard data. This time I know there are some serious inefficiencies in the way I'm rendering and I just didn't get around to making it better. Expect this game to be a resource hog.
+
+That's all for me. Thanks again to everyone that made this expo such a great experience. I've enjoyed getting to know this community and getting a lot more experience in Lisp.
+
+Regards,
+Brian Taylor (wubo)

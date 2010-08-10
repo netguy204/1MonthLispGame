@@ -239,10 +239,12 @@
   (if-let [target (save-selector (world-surface) *map-file-type*)]
     (spit target (dosync (:map @*test-world*)))))
 
-(def *world-frame*)
+(defn world-frame []
+  (defonce *world-frame* (make-window "World Designer"))
+  *world-frame*)
 
 (defn- about-program []
-  (help-html-dialog *world-frame* "Using World Designer"
+  (help-html-dialog (world-frame) "Using World Designer"
 		    (get-resource "MonthGame/using-world-designer.html")))
 
 (defn- clear-surface []
@@ -256,8 +258,7 @@
       ["Help" [["Instructions..." #(about-program)]]]])
 
 (defn world-designer []
-  (binding [*world-frame* (make-window "World Designer")]
-    (let [frame *world-frame*
+    (let [frame (world-frame)
 	  panel (world-surface)
 	  close-handler (stop-animation-listener *edit-animator*)]
       (doto frame
@@ -267,4 +268,4 @@
 	(.setJMenuBar (build-menu *main-menu* (JMenuBar.)))
 	(.setVisible true))
       (attach-mouse-adapter panel (make-mouse-adapter *world-mouse*))
-      (start-animation *edit-animator*))))
+      (start-animation *edit-animator*)))

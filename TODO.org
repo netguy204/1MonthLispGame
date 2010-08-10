@@ -1,6 +1,7 @@
 
-
-* TODO Collision Callbacks
+* World editor depth sorting
+* Padding on left of help
+* DONE Collision Callbacks
 
 Add (collided) to Entity spec. Call on collision. Provide other entity.
 
@@ -43,20 +44,20 @@ Done but same as cannon
 ** DONE Explosions
 Done but need variety
 
-* Interactive background
-** Lay down walls by drawing
-** check collision against drawn objects
+* DONE Interactive background
+** DONE Lay down walls by drawing
+** DONE check collision against drawn objects
 *** Stop tanks on collide
 *** Destroy missiles on collide
 *** Don't interfere with elevated objects
 
 * Particle effects
-** Missile exhaust
+** DONE Missile exhaust
 ** Damage
 ** Clouds and birds
 
-* End of Game
-** Destroy tank animation
+* DONE End of Game
+** DONE Destroy tank animation
 Spinning and scaling
 
 * Game world

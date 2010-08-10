@@ -24,6 +24,7 @@
 			JDialog Box JTextPane
 			JButton JScrollPane)
 	   (javax.swing.filechooser FileFilter FileView)
+	   (java.awt Insets Color)
 	   (java.awt.event ActionListener)))
 
 
@@ -157,9 +158,12 @@
   (let [dialog (JDialog. parent title false)
 	vbox (Box/createVerticalBox)
 	hbox (Box/createHorizontalBox)
+	insets (Insets. 0 10 0 0)
 	text (JTextPane.)]
     
     (doto text
+      (.setMargin insets)
+      (.setBackground (. Color white))
       (.setEditable false)
       (.setContentType "text/html")
       (.setText (slurp* src)))

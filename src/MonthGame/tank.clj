@@ -123,7 +123,7 @@
 (defn make-tank [frames doto angle pos]
   (let [rotate-rate (* Math/PI 0.25)
 	move-rate 50
-	move-energy 200
+	move-energy 400
 	fire-energy 200
 	fire-charge 0
 	charge-rate 130
